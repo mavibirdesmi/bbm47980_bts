@@ -1,0 +1,11 @@
+name: grad_proj
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - torchaudio
+  - pytorch
+  - pytorch-cuda=11.7
+  - torchvision
+  - pip
+prefix: /home/mavibirdesmi/miniconda3/envs/grad_proj

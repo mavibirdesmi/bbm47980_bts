@@ -26,8 +26,7 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-
-path_to_dataset = "/media/mavibirdesmi/0F85E95C3B24E86C/Datasets/LABEL DATA_1/"
+path_to_dataset = os.environ["DATASET_PATH"]
 
 available_samples = []
 for dir_name in os.listdir(path_to_dataset):

@@ -8,6 +8,7 @@ from monai import transforms
 from monai.data.image_reader import NrrdReader
 
 import matplotlib.pyplot as plt
+
 import os
 import json
 
@@ -79,7 +80,7 @@ print(f"{bcolors.OKBLUE}{bcolors.BOLD}Label file: {bcolors.ENDC}"
       f"{path_to_nrrd_image_label}")
 print()
 
-reader = NrrdReader()
+reader = NrrdReader(index_order='F')
 image, image_data = transforms.LoadImage(
     reader = reader
 )(path_to_nrrd_image)
@@ -97,6 +98,27 @@ print("Shape", label.shape)
 print("Orientation:", label_data["space"])
 if label.ndim == 3:
     print("Unique Numbers:", np.unique(label.numpy()))
+
+    fig, axs = plt.subplots(1,2,figsize=(12,6))
+    axs[0].imshow(image[:,:,50], cmap='gray')
+    axs[0].title.set_text('Image')
+    axs[1].imshow(label[:,:,50], cmap='gray')
+    axs[1].title.set_text('Label')
 else:
     print("unique vals in 0th dim", np.unique(label[0,:,:,:].numpy()), sep="\n")
     print("unique vals in 1th dim", np.unique(label[1,:,:,:].numpy()), sep="\n")
+
+    fig, axs = plt.subplots(1,3,figsize=(12,6))
+    axs[0].imshow(image[:,:,60], cmap='gray')
+    axs[0].title.set_text('Image')
+    axs[1].imshow(label[0,:,:,60], cmap='gray')
+    axs[1].title.set_text('Label 0th Dim')
+    axs[2].imshow(label[1,:,:,60], cmap='gray')
+    axs[2].title.set_text('Label 1th Dim')
+
+plt.savefig(os.path.join(
+    PROJECT_DIR,
+    "..",
+    "assets",
+    f"{patient_name}.png"
+))

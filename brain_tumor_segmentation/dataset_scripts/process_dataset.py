@@ -55,7 +55,17 @@ def transform_3d_nrrd (
     data : np.ndarray,
     label_brain : int,
     label_tumour : int
-):
+) -> np.ndarray:
+    """Transform function for 3 dimensional NRRD images
+
+    Args:
+        data (np.ndarray): Data to be transformed, expected to have .ndim=4
+        label_brain (int): The integer that refers to brain in the data
+        label_tumour (int): The integer that refers to tumour in the data
+
+    Returns:
+        np.ndarray: Transformed data
+    """
     new_data = np.zeros_like(data, dtype=np.uint8)
     # convert brain labels to 1
     new_data[data == label_brain] = 1
@@ -70,7 +80,19 @@ def transform_4d_nrrd (
     brain_0th_axis_idx : int,
     label_tumour : int,
     tumour_0th_axis_idx : int
-):
+) -> np.ndarray:
+    """Transform function for 4 dimensional NRRD images
+
+    Args:
+        data (np.ndarray): Data to be transformed, expected to have .ndim=4
+        label_brain (int): The integer that refers to brain in the data
+        brain_0th_axis_idx (int): In 0th axis, the channel has the brain labels
+        label_tumour (int): The integer that refers to tumour in the data
+        tumour_0th_axis_idx (int): In 0th axis, the channel has the tumour labels
+
+    Returns:
+        np.ndarray: Transformed data
+    """
     brain_mask = data[brain_0th_axis_idx] == label_brain
     tumour_mask = data[tumour_0th_axis_idx] == label_tumour
 

@@ -147,5 +147,6 @@ if __name__ == '__main__':
     transformed_data
     nrrd.write(
         os.path.join(path.parent.__str__(), 'transformed_label.nrrd'),
-        transformed_data
+        transformed_data,
+        header=header
     )

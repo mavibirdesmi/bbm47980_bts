@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # taken from https://stackoverflow.com/q/59895/11913195
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )

@@ -354,6 +354,7 @@ def train_epoch(
     start_time = time.time()
     for idx, batch_data in enumerate(loader):
         data, target = batch_data["image"].to(device), batch_data["label"].to(device)
+        optimizer.zero_grad()
         logits = model(data)
         loss = loss_function(logits, target)
         loss.backward()

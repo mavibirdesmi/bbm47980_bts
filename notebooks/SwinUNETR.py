@@ -21,7 +21,7 @@ from tqdm.auto import tqdm
 
 import wandb
 
-wandb.init(project="demo")
+wandb.init(project="swin-unetr-overfit")
 
 
 # In[3]:
@@ -154,22 +154,22 @@ img_transforms = transforms.Compose([
     add_new_axis,
     transforms.Resized(keys=["image", "label"], spatial_size=(200, 200, 200)),
     ConvertToMultiChannelBasedOnBtsClassesd(keys=["label"]),
-    # transforms.CropForegroundd(
-    #     keys=["image", "label"],
-    #     source_key="image",
-    #     # k_divisible=[roi[0], roi[1], roi[2]],
-    # ),
-    # transforms.RandSpatialCropd(
-    #     keys=["image", "label"],
-    #     roi_size=[roi[0], roi[1], roi[2]],
-    #     random_size=False,
-    # ),
-    # transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
-    # transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
-    # transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=2),
-    # transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
-    # transforms.RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
-    # transforms.RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
+    transforms.CropForegroundd(
+        keys=["image", "label"],
+        source_key="image",
+        # k_divisible=[roi[0], roi[1], roi[2]],
+    ),
+    transforms.RandSpatialCropd(
+        keys=["image", "label"],
+        roi_size=[roi[0], roi[1], roi[2]],
+        random_size=False,
+    ),
+    transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
+    transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=1),
+    transforms.RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=2),
+    transforms.NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
+    transforms.RandScaleIntensityd(keys="image", factors=0.1, prob=1.0),
+    transforms.RandShiftIntensityd(keys="image", offsets=0.1, prob=1.0),
     ]
 )
 
@@ -207,9 +207,6 @@ dataloader = data.DataLoader(
 
 
 # In[10]:
-
-
-import torch
 
 from monai.networks.nets import SwinUNETR
 from monai.metrics import DiceMetric
@@ -277,9 +274,8 @@ def save_checkpoint(model, epoch, filename="model.pt", best_acc=0, dir_add=root_
 # In[14]:
 
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda"
 device = torch.device(device)
-device
 
 
 # ### SwinUNETR Model
@@ -294,7 +290,7 @@ model = SwinUNETR(
     feature_size=24,
     use_checkpoint=True,
 )
-
+model = torch.nn.DataParallel(model)
 model = model.to(device)
 
 
@@ -303,11 +299,10 @@ model = model.to(device)
 # In[16]:
 
 
-batch_size = 1
+batch_size = 2
 sw_batch_size = 2
-fold = 1
 infer_overlap = 0.5
-max_epochs = 100
+max_epochs = 1000
 val_every = 10
 
 
@@ -369,7 +364,7 @@ def train_epoch(
             "Loss: {:.4f}".format(run_loss.avg),
             "Time {:.2f}s".format(time.time() - start_time),
         )
-        wandb.log({"loss": run_loss})
+        wandb.log({"loss": loss.item()})
         start_time = time.time()
     return run_loss.avg
 

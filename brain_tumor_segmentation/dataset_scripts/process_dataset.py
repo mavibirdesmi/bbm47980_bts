@@ -2,14 +2,12 @@
 ## designed for manipulating label files
 
 import argparse
-
-import nrrd
-
-import numpy as np
-from typing import Dict
-
 import os
 import pathlib
+from typing import Dict
+
+import nrrd
+import numpy as np
 
 parser = argparse.ArgumentParser(
     prog="Nrrd Label Converter for BTS Dataset sent by Dr. Şahin",
@@ -18,43 +16,27 @@ parser = argparse.ArgumentParser(
     Shape: HxWxD
     Brain Label: 1
     Tumour Label: 2
-    """
+    """,
+)
+parser.add_argument("--path2image", type=str, required=True, help="Path to the image")
+parser.add_argument(
+    "--label_brain", type=int, required=True, help="Label used for brain in the file"
 )
 parser.add_argument(
-    '--path2image',
-    type=str,
-    required=True,
-    help='Path to the image'
-)
-parser.add_argument(
-    '--label_brain',
-    type=int,
-    required=True,
-    help="Label used for brain in the file"
-)
-parser.add_argument(
-    '--label_tumour',
-    type=int,
-    required=True,
-    help="Label used for tumour in the file"
+    "--label_tumour", type=int, required=True, help="Label used for tumour in the file"
 )
 # only required if ndim is 4
 parser.add_argument(
-    '--brain_0th_axis_idx',
-    type=int,
-    help="Label used for brain in the file"
+    "--brain_0th_axis_idx", type=int, help="Label used for brain in the file"
 )
 parser.add_argument(
-    '--tumour_0th_axis_idx',
-    type=int,
-    help="Label used for tumour in the file"
+    "--tumour_0th_axis_idx", type=int, help="Label used for tumour in the file"
 )
 args = parser.parse_args()
 
-def transform_3d_nrrd (
-    data : np.ndarray,
-    label_brain : int,
-    label_tumour : int
+
+def transform_3d_nrrd(
+    data: np.ndarray, label_brain: int, label_tumour: int
 ) -> np.ndarray:
     """Transform function for 3 dimensional NRRD images
 
@@ -74,12 +56,13 @@ def transform_3d_nrrd (
 
     return new_data
 
-def transform_4d_nrrd (
-    data : np.ndarray,
-    label_brain : int,
-    brain_0th_axis_idx : int,
-    label_tumour : int,
-    tumour_0th_axis_idx : int
+
+def transform_4d_nrrd(
+    data: np.ndarray,
+    label_brain: int,
+    brain_0th_axis_idx: int,
+    label_tumour: int,
+    tumour_0th_axis_idx: int,
 ) -> np.ndarray:
     """Transform function for 4 dimensional NRRD images
 
@@ -105,20 +88,15 @@ def transform_4d_nrrd (
 
     return new_data
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     filename = os.path.basename(args.path2image)
     path = pathlib.PurePath(args.path2image)
     print(f"Processing {path.parent.name}/{filename}...")
     print(path.parent)
-    data, header = nrrd.read(
-        filename=args.path2image
-    )
+    data, header = nrrd.read(filename=args.path2image)
     if data.ndim == 3:
-        transformed_data = transform_3d_nrrd(
-            data,
-            args.label_brain,
-            args.label_tumour
-        )
+        transformed_data = transform_3d_nrrd(data, args.label_brain, args.label_tumour)
     elif data.ndim == 4:
         try:
             args.brain_0th_axis_idx
@@ -126,10 +104,12 @@ if __name__ == '__main__':
         except AttributeError as e:
             print(e)
             print(
-                ("It seems like you gave an image with four dimensions but "
-                "haven't provided which indexes correspond to which labels. "
-                "Please set these values with `brain_0th_axis_idx` and "
-                "`brain_tumour_0th_axis_idx`." )
+                (
+                    "It seems like you gave an image with four dimensions but "
+                    "haven't provided which indexes correspond to which labels. "
+                    "Please set these values with `brain_0th_axis_idx` and "
+                    "`brain_tumour_0th_axis_idx`."
+                )
             )
             exit(1)
         transformed_data = transform_4d_nrrd(
@@ -137,16 +117,13 @@ if __name__ == '__main__':
             args.label_brain,
             args.brain_0th_axis_idx,
             args.label_tumour,
-            args.tumour_0th_axis_idx
+            args.tumour_0th_axis_idx,
         )
-    
 
-    print(
-        f"Finished processing, writing to {path.parent}/transformed_label.nrrd"
-    )
+    print(f"Finished processing, writing to {path.parent}/transformed_label.nrrd")
     transformed_data
     nrrd.write(
-        os.path.join(path.parent.__str__(), 'transformed_label.nrrd'),
+        os.path.join(path.parent.__str__(), "transformed_label.nrrd"),
         transformed_data,
-        header=header
+        header=header,
     )

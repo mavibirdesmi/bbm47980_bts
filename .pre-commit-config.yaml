@@ -1,0 +1,11 @@
+repos:
+- repo: https://github.com/psf/black
+  rev: 21.12b0
+  hooks:
+  - id: black
+    additional_dependencies: ['click<8.1']
+- repo: https://github.com/pycqa/isort
+  rev: 5.11.5
+  hooks:
+  - id: isort
+    args: ["--profile", "black"]

@@ -21,8 +21,10 @@ def generate_dummy_data(
         random_patient_id = uuid.uuid4()
 
         data[random_patient_id] = {
-            "image": torch.rand(1, *sample_shape, dtype=torch.float64),
-            "label": torch.rand(NUM_LABELS, *sample_shape, dtype=torch.float64),
+            "image": torch.rand(NUM_CHANNELS, *sample_shape, dtype=torch.float64),
+            "label": torch.randint(
+                low=0, high=2, size=(NUM_LABELS, *sample_shape), dtype=torch.bool
+            ),
         }
 
     return data

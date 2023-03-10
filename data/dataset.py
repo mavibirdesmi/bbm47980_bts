@@ -21,16 +21,13 @@ def generate_dummy_data(
         random_patient_id = uuid.uuid4()
 
         data[random_patient_id] = {
-            "image": torch.rand(NUM_CHANNELS, *sample_shape, dtype=torch.float64),
+            "image": torch.rand(NUM_CHANNELS, *sample_shape, dtype=torch.float32),
             "label": torch.randint(
                 low=0, high=2, size=(NUM_LABELS, *sample_shape), dtype=torch.bool
             ),
         }
 
     return data
-
-
-DUMMY_DATA = generate_dummy_data()
 
 
 class DummyDataset(Dataset):
@@ -46,6 +43,8 @@ class DummyDataset(Dataset):
 
 
 def get_dataloader(batch_size: int = 2):
+    DUMMY_DATA = generate_dummy_data()
+
     dataset = DummyDataset(DUMMY_DATA)
 
     dataloader = DataLoader(dataset, batch_size=batch_size, pin_memory=True)

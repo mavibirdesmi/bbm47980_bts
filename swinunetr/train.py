@@ -233,6 +233,8 @@ def main():
         use_checkpoint=hyperparams.GRADIENT_CHECKPOINT,
     )
 
+    model = torch.nn.DataParallel(model)
+
     # dice_loss = DiceLoss(to_onehot_y=False, softmax=True)
     dice_loss = DiceLoss(include_background=True, to_onehot_y=False, softmax=True)
 

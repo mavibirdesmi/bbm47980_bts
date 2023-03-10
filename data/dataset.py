@@ -11,12 +11,18 @@ def generate_dummy_data(
 ):
     data = {}
 
+    # 1 channel: T1 images
+    NUM_CHANNELS = 1
+
+    # Brain & Tumor
+    NUM_LABELS = 2
+
     for _ in range(n):
         random_patient_id = uuid.uuid4()
 
         data[random_patient_id] = {
-            "image": torch.rand(*sample_shape, dtype=torch.float64),
-            "label": torch.rand(*sample_shape, dtype=torch.float64),
+            "image": torch.rand(1, *sample_shape, dtype=torch.float64),
+            "label": torch.rand(NUM_LABELS, *sample_shape, dtype=torch.float64),
         }
 
     return data
@@ -35,3 +41,11 @@ class DummyDataset(Dataset):
 
     def __getitem__(self, index):
         return self.data[self.keys[index]]
+
+
+def get_dataloader(batch_size: int = 2):
+    dataset = DummyDataset(DUMMY_DATA)
+
+    dataloader = DataLoader(dataset, batch_size=batch_size, pin_memory=True)
+
+    return dataloader

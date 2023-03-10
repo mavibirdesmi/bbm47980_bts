@@ -1,0 +1,35 @@
+BATCH_SIZE: 1
+
+SHUFFLE: true
+
+ROI: [128, 128, 128]
+
+IN_CHANNELS: 1
+OUT_CHANNELS: 3
+
+FEATURE_SIZE: 48
+
+GRADIENT_CHECKPOINT: TRUE
+
+EPOCHS: 100
+FOLD: 1
+
+# Batch size to run window slices
+SW_BATCH_SIZE: 2
+
+# 1e-4
+LEARNING_RATE: 0.0001
+
+INFER_OVERLAP: 0.5
+
+# 1e-5
+WEIGHT_DECAY: 0.00001
+
+DEVICE: cuda
+
+LABELS:
+  BRAIN: 0
+  TUMOR: 1
+
+# Data directory should contain
+DATA_DIR: "../../data"

@@ -1,5 +1,5 @@
 import os
-from typing import Optional, Union
+from typing import Generic, Optional, TypeVar, Union
 
 import torch
 import yaml
@@ -8,8 +8,11 @@ from common import logutils
 
 logger = logutils.get_logger(__name__)
 
+K = TypeVar("K", bound=str)
+V = TypeVar("V")
 
-class DotConfig:
+
+class DotConfig(Generic[K, V]):
     """A simple configuration class with dot notation support."""
 
     def __init__(self, config: dict):

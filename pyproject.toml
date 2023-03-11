@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "bts"
+version = "0.1.0"
+description = "Brain Tumour Segmentation Graduation Project"
+authors = ["Desmin Alpaslan, Vedat Baday"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.9.12"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

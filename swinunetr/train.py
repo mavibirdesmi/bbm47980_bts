@@ -170,7 +170,7 @@ def val_epoch(
     epoch_loss = miscutils.AverageMeter()
 
     post_softmax = Activations(softmax=True)
-    post_pred = AsDiscrete(argmax=False, threshold=0.5)
+    post_pred = AsDiscrete(argmax=True)
 
     with torch.no_grad(), logutils.etqdm(loader, epoch=epoch) as pbar:
         for batch_data in pbar:

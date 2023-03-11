@@ -76,7 +76,7 @@ def train_epoch(
     model = model.to(device)
     model.train()
 
-    epoch_loss = miscutils.AverageMeter()
+    train_loss = miscutils.AverageMeter()
 
     with logutils.etqdm(loader, epoch=epoch) as pbar:
         for batch_data in pbar:
@@ -94,7 +94,7 @@ def train_epoch(
 
             loss = loss.item()
 
-            epoch_loss.update(loss, image.size(0))
+            train_loss.update(loss, image.size(0))
 
             metrics = {
                 "Mean Train Loss": loss,
@@ -103,7 +103,7 @@ def train_epoch(
             pbar.log_metrics(metrics)
 
     history = {
-        "Mean Loss": epoch_loss.avg,
+        "Mean Loss": train_loss.avg,
     }
 
     return history
@@ -166,8 +166,8 @@ def val_epoch(
 
     dice_metric = DiceMetric(include_background=True, reduction="mean_batch")
 
-    epoch_accuracy = miscutils.AverageMeter()
-    epoch_loss = miscutils.AverageMeter()
+    val_accuracy = miscutils.AverageMeter()
+    val_loss = miscutils.AverageMeter()
 
     post_softmax = Activations(softmax=True)
     post_pred = AsDiscrete(argmax=True)
@@ -192,13 +192,13 @@ def val_epoch(
             loss: torch.Tensor = loss_function(logits, preds)
             loss = loss.item()
 
-            epoch_loss.update(loss, image.size(0))
+            val_loss.update(loss, image.size(0))
 
             dice_metric.reset()
             dice_metric(y_pred=preds, y=batch_labels)
 
             accuracy = dice_metric.aggregate()
-            epoch_accuracy.update(accuracy, image.size(0))
+            val_accuracy.update(accuracy, image.size(0))
 
             num_gt_labels = len(labels)
             num_pred_labels = accuracy.numel()
@@ -211,15 +211,15 @@ def val_epoch(
             metrics = {
                 "Mean Val Brain Acc.": accuracy[labels.BRAIN],
                 "Mean Val Tumor Acc.": accuracy[labels.TUMOR],
-                "Mean Val Loss": epoch_loss,
+                "Mean Val Loss": val_loss,
             }
 
             pbar.log_metrics(metrics)
 
     history = {
-        "Mean Brain Acc.": epoch_accuracy.avg[labels.BRAIN],
-        "Mean Tumor Acc.": epoch_accuracy.avg[labels.TUMOR],
-        "Mean Loss": epoch_loss.avg,
+        "Mean Brain Acc.": val_accuracy.avg[labels.BRAIN],
+        "Mean Tumor Acc.": val_accuracy.avg[labels.TUMOR],
+        "Mean Loss": val_loss.avg,
     }
 
     return history

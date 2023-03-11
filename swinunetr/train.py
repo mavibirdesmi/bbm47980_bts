@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from common import logutils, miscutils
 from common.miscutils import DotConfig
-from data.dataset import get_dataloader
+from data.dummydataset import get_dataloader
 from swinunetr import model as smodel
 
 logger = logutils.get_logger(__name__)
@@ -69,8 +69,6 @@ def train_epoch(
     model = model.to(device)
     model.train()
 
-    dice_metric = DiceMetric(include_background=True, reduction="mean_batch")
-
     epoch_loss = miscutils.AverageMeter()
 
     with logutils.etqdm(loader, epoch=epoch) as pbar:
@@ -90,8 +88,6 @@ def train_epoch(
             loss = loss.item()
 
             epoch_loss.update(loss, image.size(0))
-
-            dice_metric.reset()
 
             metrics = {
                 "Mean Train Loss": loss,

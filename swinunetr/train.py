@@ -8,7 +8,7 @@ from monai.inferers import sliding_window_inference
 from monai.losses.dice import DiceLoss
 from monai.metrics import DiceMetric
 from monai.transforms import Activations, AsDiscrete
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 
 from common import logutils, miscutils
 from common.miscutils import DotConfig
@@ -28,7 +28,12 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--hyperparameters",
         type=str,
-        help="Training hyperparameters file path. The file in the path given should be a valid yaml file. If not specified script will look for a ``hyperparameters.yaml`` file in the same directory the script is located in.",
+        help=(
+            "Training hyperparameters file path. The file in the path given should be "
+            "a valid yaml file. If not specified script will look for a "
+            "``hyperparameters.yaml`` file in the same directory the script is located "
+            "in."
+        ),
     )
     parser.add_argument(
         "--output", type=str, required=True, help="Path to save the trained model."
@@ -44,7 +49,7 @@ def train_epoch(
     optimizer: torch.optim.Optimizer,
     epoch: int,
     device: torch.device = None,
-) -> torch.Tensor:
+) -> Dict[str, Union[float, torch.Tensor]]:
     """Trains the given model for one epoch based on the optimizer given. The training
     progress is displayed with a custom progress bar. At the end of the each batch the
     mean of the batch loss is displayed within the progress bar.
@@ -60,7 +65,9 @@ def train_epoch(
             will be set to ``cuda`` if it is available, else will be set to ``cpu``.
 
     Returns:
-        Trained model.
+        A dictionary containing statistics about the model training process.
+        Keys and values available in the dictionary are as follows:
+            ``Mean Loss``: Mean validation loss value for the whole segmentation.
     """
     if not device:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -112,7 +119,7 @@ def val_epoch(
     labels: DotConfig[str, DotConfig[str, int]],
     epoch: int,
     device: torch.device = None,
-) -> torch.Tensor:
+) -> Dict[str, Union[float, torch.Tensor]]:
     """Evaluates the given model for one epoch.
 
     Args:
@@ -133,7 +140,11 @@ def val_epoch(
         AssertionError: If labels does not have either of `BRAIN` and `TUMOR` keys.
 
     Returns:
-        _description_
+        A dictionary containing statistics about the model validation process.
+        Keys and values available in the dictionary are as follows:
+            ``Mean Brain Acc.``: Mean accuracy value for the brain segmentation
+            ``Mean Tumor Acc.``: Mean accuracy value for the tumor segmentation
+            ``Mean Loss``: Mean validation loss value for the whole segmentation.
     """
     for expected_label in ["BRAIN", "TUMOR"]:
         assert expected_label in labels, f"labels should have a {expected_label} key!"

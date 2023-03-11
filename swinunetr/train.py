@@ -169,7 +169,7 @@ def val_epoch(
     epoch_accuracy = miscutils.AverageMeter()
     epoch_loss = miscutils.AverageMeter()
 
-    post_sigmoid = Activations(softmax=True)
+    post_softmax = Activations(softmax=True)
     post_pred = AsDiscrete(argmax=False, threshold=0.5)
 
     with torch.no_grad(), logutils.etqdm(loader, epoch=epoch) as pbar:
@@ -184,7 +184,7 @@ def val_epoch(
             outputs = decollate_batch(logits)
             preds = torch.stack(
                 [
-                    post_pred(post_sigmoid(val_pred_tensor))
+                    post_pred(post_softmax(val_pred_tensor))
                     for val_pred_tensor in outputs
                 ]
             )

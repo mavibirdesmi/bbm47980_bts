@@ -1,6 +1,6 @@
 import argparse
 from functools import partial
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 import torch
 from monai.data import decollate_batch
@@ -48,7 +48,7 @@ def train_epoch(
     loss_function: torch.nn.modules.loss._Loss,
     optimizer: torch.optim.Optimizer,
     epoch: int,
-    device: torch.device = None,
+    device: Optional[torch.device] = None,
 ) -> Dict[str, Union[float, torch.Tensor]]:
     """Trains the given model for one epoch based on the optimizer given. The training
     progress is displayed with a custom progress bar. At the end of the each batch the
@@ -118,12 +118,12 @@ def val_epoch(
     overlap: int,
     labels: DotConfig[str, DotConfig[str, int]],
     epoch: int,
-    device: torch.device = None,
+    device: Optional[torch.device] = None,
 ) -> Dict[str, Union[float, torch.Tensor]]:
-    """Evaluates the given model for one epoch.
+    """Evaluates the given model.
 
     Args:
-        model: Model to train.
+        model: Model to evaluate.
         loader: Data loader.
             The batch data should be a dictionary containing "image" and "label" keys.
         loss_function: Loss function to measure the loss during the validation.

@@ -16,7 +16,7 @@ class DotConfig(Generic[K, V]):
     """A simple configuration class with dot notation support."""
 
     def __init__(self, config: dict):
-        for (key, value) in config.items():
+        for key, value in config.items():
             if isinstance(value, dict):
                 setattr(self, key, DotConfig(value))
             else:
@@ -36,7 +36,9 @@ def load_hyperparameters(path: Optional[str] = None) -> DotConfig:
     """Reads and retrieves hyperparameters accessible using the dot notation.
 
     Args:
-        path: Path to hyperparameter configuration file. The file in the path given should be a valid yaml file. If not specified script will look for a ``hyperparameters.yaml`` file in the same directory the script is located in."
+        path: Path to hyperparameter configuration file. The file in the path given
+        should be a valid yaml file. If not specified script will look for a
+        ``hyperparameters.yaml`` file in the same directory the script is located in.
 
     Returns:
         DotConfig object containing hyperparameters.

@@ -23,6 +23,8 @@ poetry config virtualenvs.in-project true
 poetry install
 ```
 
+If poetry fails at `poetry install` stage, with error
+"Failed to create the collection: Prompt dismissed.." try:
 ```bash
 PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring poetry install
 ```
@@ -36,8 +38,6 @@ And, to remove a package
 poetry remove <package-name>
 ```
 
-If poetry fails at `poetry install` stage, with error
-"Failed to create the collection: Prompt dismissed.." try:
 
 ## Notes
 Before allocating a GPU be sure to ``poetry shell`` is not executed. In other terms,

@@ -1,6 +1,15 @@
+# IPython checkpoints
 .ipynb_checkpoints
+
+# Python cache
 __pycache__
-assets
+
+# Virtual environmens
 .env
 
-wandb
+# Poetry
+poetry.lock
+.venv
+
+# Wandb artifacts
+*wandb

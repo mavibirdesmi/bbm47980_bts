@@ -1,4 +1,9 @@
+# IPython checkpoints
 .ipynb_checkpoints
+
+# Python cache
 __pycache__
-assets
+
+# Virtual environments
 .env
+.venv

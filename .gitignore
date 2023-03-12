@@ -4,6 +4,12 @@
 # Python cache
 __pycache__
 
-# Virtual environments
+# Virtual environmens
 .env
+
+# Poetry
+poetry.lock
 .venv
+
+# Wandb artifacts
+*wandb

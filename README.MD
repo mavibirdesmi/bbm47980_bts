@@ -41,4 +41,4 @@ poetry remove <package-name>
 
 ## Notes
 Before allocating a GPU be sure to ``poetry shell`` is not executed. In other terms,
-execute ``poetry shell`` after a GPU have been allocated.
+execute ``poetry shell`` after a GPU has been allocated.

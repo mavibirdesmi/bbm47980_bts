@@ -38,3 +38,7 @@ poetry remove <package-name>
 
 If poetry fails at `poetry install` stage, with error
 "Failed to create the collection: Prompt dismissed.." try:
+
+## Notes
+Before allocating a GPU be sure to ``poetry shell`` is not executed. In other terms,
+execute ``poetry shell`` after a GPU have been allocated.

@@ -4,7 +4,7 @@ from typing import Generic, Optional, TypeVar, Union
 import torch
 import yaml
 
-from common import logutils
+from brain_tumor_segmentation.common import logutils
 
 logger = logutils.get_logger(__name__)
 

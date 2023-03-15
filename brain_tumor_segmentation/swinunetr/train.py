@@ -1,6 +1,6 @@
 import argparse
 from functools import partial
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 import torch
 from monai.data import decollate_batch
@@ -10,10 +10,10 @@ from monai.metrics import DiceMetric
 from monai.transforms import Activations, AsDiscrete
 from torch.utils.data import DataLoader
 
-from common import logutils, miscutils
-from common.miscutils import DotConfig
-from data.dummydataset import get_dataloader
-from swinunetr import model as smodel
+from brain_tumor_segmentation.common import logutils, miscutils
+from brain_tumor_segmentation.common.miscutils import DotConfig
+from brain_tumor_segmentation.data.dummydataset import get_dataloader
+from brain_tumor_segmentation.swinunetr import model as smodel
 
 logger = logutils.get_logger(__name__)
 
@@ -42,7 +42,74 @@ def get_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def test(
+def train_epoch(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    loss_function: torch.nn.modules.loss._Loss,
+    optimizer: torch.optim.Optimizer,
+    epoch: int,
+    device: Optional[torch.device] = None,
+) -> Dict[str, Union[float, torch.Tensor]]:
+    """Trains the given model for one epoch based on the optimizer given. The training
+    progress is displayed with a custom progress bar. At the end of the each batch the
+    mean of the batch loss is displayed within the progress bar.
+
+    Args:
+        model: Model to train.
+        loader: Data loader.
+            The batch data should be a dictionary containing "image" and "label" keys.
+        loss_function: Loss function to measure the loss during the training.
+        optimizer: Optimizer to optimize the loss.
+        epoch: Epoch number. Only used in the progress bar to display the current epoch.
+        device: Device to load the model and data into. Defaults to None. If set to None
+            will be set to ``cuda`` if it is available, else will be set to ``cpu``.
+
+    Returns:
+        A dictionary containing statistics about the model training process.
+        Keys and values available in the dictionary are as follows:
+            ``Mean Loss``: Mean validation loss value for the whole segmentation.
+    """
+    if not device:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = torch.device(device)
+
+    model = model.to(device)
+    model.train()
+
+    train_loss = miscutils.AverageMeter()
+
+    with logutils.etqdm(loader, epoch=epoch) as pbar:
+        for batch_data in pbar:
+            batch_data: Dict[str, torch.Tensor]
+            image = batch_data["image"].to(device)
+            label = batch_data["label"].to(device)
+
+            optimizer.zero_grad()
+
+            logits = model(image)
+            loss: torch.Tensor = loss_function(logits, label)
+
+            loss.backward()
+            optimizer.step()
+
+            loss = loss.item()
+
+            train_loss.update(loss, image.size(0))
+
+            metrics = {
+                "Mean Train Loss": loss,
+            }
+
+            pbar.log_metrics(metrics)
+
+    history = {
+        "Mean Loss": train_loss.avg,
+    }
+
+    return history
+
+
+def val_epoch(
     model: torch.nn.Module,
     loader: DataLoader,
     loss_function: torch.nn.modules.loss._Loss,
@@ -50,12 +117,13 @@ def test(
     sw_batch_size: int,
     overlap: int,
     labels: DotConfig[str, DotConfig[str, int]],
-    device: torch.device = None,
+    epoch: int,
+    device: Optional[torch.device] = None,
 ) -> Dict[str, Union[float, torch.Tensor]]:
-    """Tests the given model.
+    """Evaluates the given model.
 
     Args:
-        model: Model to test.
+        model: Model to evaluate.
         loader: Data loader.
             The batch data should be a dictionary containing "image" and "label" keys.
         loss_function: Loss function to measure the loss during the validation.
@@ -98,13 +166,13 @@ def test(
 
     dice_metric = DiceMetric(include_background=True, reduction="mean_batch")
 
-    test_accuracy = miscutils.AverageMeter()
-    test_loss = miscutils.AverageMeter()
+    val_accuracy = miscutils.AverageMeter()
+    val_loss = miscutils.AverageMeter()
 
     post_softmax = Activations(softmax=True)
     post_pred = AsDiscrete(argmax=True)
 
-    with torch.no_grad(), logutils.etqdm(loader) as pbar:
+    with torch.no_grad(), logutils.etqdm(loader, epoch=epoch) as pbar:
         for batch_data in pbar:
             batch_data: Dict[str, torch.Tensor]
             image = batch_data["image"].to(device)
@@ -124,13 +192,13 @@ def test(
             loss: torch.Tensor = loss_function(logits, preds)
             loss = loss.item()
 
-            test_loss.update(loss, image.size(0))
+            val_loss.update(loss, image.size(0))
 
             dice_metric.reset()
             dice_metric(y_pred=preds, y=batch_labels)
 
             accuracy = dice_metric.aggregate()
-            test_loss.update(accuracy, image.size(0))
+            val_accuracy.update(accuracy, image.size(0))
 
             num_gt_labels = len(labels)
             num_pred_labels = accuracy.numel()
@@ -141,17 +209,17 @@ def test(
             )
 
             metrics = {
-                "Mean Test Brain Acc.": accuracy[labels.BRAIN],
-                "Mean Test Tumor Acc.": accuracy[labels.TUMOR],
-                "Mean Test Loss": test_loss,
+                "Mean Val Brain Acc.": accuracy[labels.BRAIN],
+                "Mean Val Tumor Acc.": accuracy[labels.TUMOR],
+                "Mean Val Loss": val_loss,
             }
 
             pbar.log_metrics(metrics)
 
     history = {
-        "Mean Brain Acc.": test_accuracy.avg[labels.BRAIN],
-        "Mean Tumor Acc.": test_accuracy.avg[labels.TUMOR],
-        "Mean Loss": test_accuracy.avg,
+        "Mean Brain Acc.": val_accuracy.avg[labels.BRAIN],
+        "Mean Tumor Acc.": val_accuracy.avg[labels.TUMOR],
+        "Mean Loss": val_loss.avg,
     }
 
     return history
@@ -177,30 +245,58 @@ def main():
     # dice_loss = DiceLoss(to_onehot_y=False, softmax=True)
     dice_loss = DiceLoss(include_background=True, to_onehot_y=False, softmax=True)
 
-    test_loader = get_dataloader()
-
-    logger.info("Starting test")
-
-    history = test(
-        model,
-        loader=test_loader,
-        loss_function=dice_loss,
-        roi_size=hyperparams.ROI,
-        sw_batch_size=hyperparams.SW_BATCH_SIZE,
-        overlap=hyperparams.INFER_OVERLAP,
-        labels=hyperparams.LABELS,
-        device=hyperparams.DEVICE,
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=hyperparams.LEARNING_RATE,
+        weight_decay=hyperparams.WEIGHT_DECAY,
+    )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=hyperparams.EPOCHS
     )
 
-    loss = history["Mean Loss"]
-    brain_acc = history["Mean Brain Acc."]
-    tumor_acc = history["Mean Tumor Acc."]
+    train_loader = get_dataloader()
+    val_loader = get_dataloader()
 
-    logger.info(
-        f"Mean Val Loss: {loss} "
-        f"Mean Val Brain Acc.: {brain_acc} "
-        f"Mean Val Tumor Acc.: {tumor_acc} "
-    )
+    for epoch in range(1, hyperparams.EPOCHS + 1):
+        logger.info(f"Epoch {epoch} is starting.")
+
+        train_history = train_epoch(
+            model,
+            loader=train_loader,
+            loss_function=dice_loss,
+            optimizer=optimizer,
+            epoch=epoch,
+            device=hyperparams.DEVICE,
+        )
+
+        logger.info(f'Mean Train Loss: {train_history["Mean Loss"]}')
+
+        if epoch % 100 == 0:
+            val_history = val_epoch(
+                model,
+                loader=val_loader,
+                loss_function=dice_loss,
+                roi_size=hyperparams.ROI,
+                sw_batch_size=hyperparams.SW_BATCH_SIZE,
+                overlap=hyperparams.INFER_OVERLAP,
+                labels=hyperparams.LABELS,
+                epoch=epoch,
+                device=hyperparams.DEVICE,
+            )
+
+            val_loss = val_history["Mean Loss"]
+            val_brain_acc = val_history["Mean Brain Acc."]
+            val_tumor_acc = val_history["Mean Tumor Acc."]
+
+            logger.info(
+                f"Mean Val Loss: {val_loss} "
+                f"Mean Val Brain Acc.: {val_brain_acc} "
+                f"Mean Val Tumor Acc.: {val_tumor_acc} "
+            )
+
+        logger.info(f"Epoch {epoch} finished.\n")
+
+        scheduler.step()
 
 
 if __name__ == "__main__":

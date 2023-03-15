@@ -1,14 +1,10 @@
-import json
 import os
 
 import matplotlib.pyplot as plt
-import monai
 import numpy as np
-import torch
 from dotenv import load_dotenv
 from monai import transforms
 from monai.data.image_reader import NrrdReader
-from scipy.ndimage import affine_transform
 
 PROJECT_DIR = os.path.dirname(__file__)
 load_dotenv(os.path.join(PROJECT_DIR, ".env"))

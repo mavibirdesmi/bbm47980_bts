@@ -10,10 +10,10 @@ from monai.metrics import DiceMetric
 from monai.transforms import Activations, AsDiscrete
 from torch.utils.data import DataLoader
 
-from brain_tumor_segmentation.common import logutils, miscutils
-from brain_tumor_segmentation.common.miscutils import DotConfig
-from brain_tumor_segmentation.data.dummydataset import get_dataloader
-from brain_tumor_segmentation.swinunetr import model as smodel
+from bts.common import logutils, miscutils
+from bts.common.miscutils import DotConfig
+from bts.data.dummydataset import get_dataloader
+from bts.swinunetr import model as smodel
 
 logger = logutils.get_logger(__name__)
 

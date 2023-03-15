@@ -4,7 +4,6 @@
 import argparse
 import os
 import pathlib
-from typing import Dict
 
 import nrrd
 import numpy as np

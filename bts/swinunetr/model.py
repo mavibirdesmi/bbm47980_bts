@@ -3,7 +3,7 @@ from typing import Tuple
 import torch
 from monai.networks.nets import SwinUNETR
 
-from brain_tumor_segmentation.common import logutils
+from bts.common import logutils
 
 logger = logutils.get_logger(__name__)
 

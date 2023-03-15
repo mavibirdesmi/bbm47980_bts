@@ -3,7 +3,7 @@
 
 Constructing dataloader
 ```py
-from brain_tumor_segmentation.bts_dataset import ( 
+from bts.bts_dataset import ( 
     ConvertToMultiChannelBasedOnBtsClassesd,
     generate_sample_paths_from_json
 )

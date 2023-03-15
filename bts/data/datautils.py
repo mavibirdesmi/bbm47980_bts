@@ -10,12 +10,14 @@ def save_prediction_as_nrrd(
     file: Union[str, IO],
     meta_dict: Dict[str, Any] = None,
 ):
-    """_summary_
+    """Saves the tensor prediction as nrrd file
 
     Args:
-        prediction (torch.Tensor): _description_
-        file (IO): _description_
-        meta_dict (Dict[str, Any], optional): _description_. Defaults to None.
+        prediction (torch.Tensor): Prediction from the model
+        file (Union[str, IO]): File path or IO to be used for saving the prediction
+        meta_dict (Dict[str, Any], optional): If given, a header is created from
+        the meta_dict values. This option is suggested if you want to view predictions
+         in applications (e.g. 3D Slicer) with the original image. Defaults to None.
 
     Example:
     ```

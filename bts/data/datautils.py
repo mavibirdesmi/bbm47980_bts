@@ -14,6 +14,8 @@ def save_prediction_as_nrrd(
 
     Args:
         prediction (torch.Tensor): Prediction from the model
+        index_in_batch (int): Index of the sample to be saved, this is needed due
+        to how meta_dict is constructed while being collated
         file (Union[str, IO]): File path or IO to be used for saving the prediction
         meta_dict (Dict[str, Any], optional): If given, a header is created from
         the meta_dict values. This option is suggested if you want to view predictions

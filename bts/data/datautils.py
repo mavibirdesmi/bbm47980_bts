@@ -33,10 +33,7 @@ def save_prediction_as_nrrd(
             )
     ```
     """
-    if prediction.is_cuda:
-        prediction = prediction.cpu()
-
-    prediction_numpy = prediction.numpy()
+    prediction = prediction.cpu().numpy()
 
     # convert meta dict to suitable header
     prediction_header = {
@@ -47,4 +44,4 @@ def save_prediction_as_nrrd(
         "space directions": meta_dict["affine"][index_in_batch, :3, :3].numpy(),
         "space origin": meta_dict["affine"][index_in_batch, :3, -1].numpy(),
     }
-    nrrd.write(file=file, data=prediction_numpy, header=prediction_header)
+    nrrd.write(file=file, data=prediction, header=prediction_header)

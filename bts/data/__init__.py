@@ -1,15 +1,15 @@
 from .dataset import (
-    BrainTumourSegmentationEchidnaDataset,
-    ConvertToMultiChannelBasedOnBtsClasses,
-    ConvertToMultiChannelBasedOnBtsClassesd,
+    ConvertToMultiChannelBasedOnEchidnaClasses,
+    ConvertToMultiChannelBasedOnEchidnaClassesd,
+    EchidnaDataset,
     JsonTransform,
 )
 from .datautils import save_prediction_as_nrrd
 
 __all__ = [
-    "BrainTumourSegmentationEchidnaDataset",
-    "ConvertToMultiChannelBasedOnBtsClasses",
-    "ConvertToMultiChannelBasedOnBtsClassesd",
+    "EchidnaDataset",
+    "ConvertToMultiChannelBasedOnEchidnaClasses",
+    "ConvertToMultiChannelBasedOnEchidnaClassesd",
     "JsonTransform",
     "save_prediction_as_nrrd",
 ]

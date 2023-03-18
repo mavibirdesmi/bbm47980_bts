@@ -11,6 +11,8 @@ monai = "1.1.0"
 pynrrd = "^1.0.0"
 pyyaml = "^6.0"
 tqdm = "^4.65.0"
+jupyter = "^1.0.0"
+ipykernel = "^6.21.3"
 
 
 [build-system]

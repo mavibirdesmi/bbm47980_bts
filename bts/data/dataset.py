@@ -3,12 +3,11 @@ import os
 from typing import Callable, Dict, List, Optional
 
 import torch
+import yaml
 from monai.config import KeysCollection
 from monai.data import Dataset
 from monai.transforms import Compose, LoadImaged, MapTransform, Transform
 from monai.utils.enums import TransformBackends
-import yaml
-
 
 from bts.common.miscutils import DotConfig
 
@@ -20,6 +19,7 @@ def read_local_labels() -> DotConfig[str, int]:
     with open(labels_path) as fp:
         labels = DotConfig(yaml.safe_load(fp))
     return labels
+
 
 class JsonTransform(MapTransform):
     def __call__(self, data):

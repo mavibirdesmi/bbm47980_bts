@@ -1,6 +1,6 @@
 import argparse
 from functools import partial
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 import torch
 from monai.data import decollate_batch
@@ -50,7 +50,7 @@ def test(
     sw_batch_size: int,
     overlap: int,
     labels: DotConfig[str, DotConfig[str, int]],
-    device: torch.device = None,
+    device: Optional[torch.device] = None,
 ) -> Dict[str, Union[float, torch.Tensor]]:
     """Tests the given model.
 

@@ -1,4 +1,4 @@
-from typing import IO, Any, Dict, Union
+from typing import IO, Any, Dict, Optional, Union
 
 import nrrd
 import torch
@@ -8,7 +8,7 @@ def save_prediction_as_nrrd(
     prediction: torch.Tensor,
     index_in_batch: int,
     file: Union[str, IO],
-    meta_dict: Dict[str, Any] = None,
+    meta_dict: Optional[Dict[str, Any]] = None,
 ):
     """Saves the tensor prediction as nrrd file.
 

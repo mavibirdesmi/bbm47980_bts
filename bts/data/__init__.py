@@ -1,4 +1,4 @@
-from .btsed_dataset import (
+from .dataset import (
     BrainTumourSegmentationEchidnaDataset,
     ConvertToMultiChannelBasedOnBtsClasses,
     ConvertToMultiChannelBasedOnBtsClassesd,

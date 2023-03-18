@@ -7,7 +7,19 @@ from monai.config import KeysCollection
 from monai.data import Dataset
 from monai.transforms import Compose, LoadImaged, MapTransform, Transform
 from monai.utils.enums import TransformBackends
+import yaml
 
+
+from bts.common.miscutils import DotConfig
+
+
+def read_local_labels() -> DotConfig[str, int]:
+    file_dir = os.path.dirname(__file__)
+    labels_path = os.path.join(file_dir, "labels.yaml")
+
+    with open(labels_path) as fp:
+        labels = DotConfig(yaml.safe_load(fp))
+    return labels
 
 class JsonTransform(MapTransform):
     def __call__(self, data):
@@ -22,33 +34,41 @@ class JsonTransform(MapTransform):
 
 
 class ConvertToMultiChannelBasedOnBtsClasses(Transform):
-    """
-    Converts 3 dimensional label to 4 dimensional based on the Brain Tumor
-    Classification (BTS) dataset
+    """Converts 3 dimensional label to 4 dimensional based on the Brain Tumor
+    Classification (BTS) dataset.
 
-    label 1 is the brain (gray matter)
+    Note that we do not explicitly make use of the ground label, since we can
+    infer it by using the predictions.
+
+    label 1 is the brain
     label 2 is the tumour
     """
 
     backend = [TransformBackends.TORCH]
 
+    def __init__(self):
+        self.labels = read_local_labels()
+
     def __call__(self, img: torch.Tensor):
         # expected ndim is 3
         assert img.ndim == 3, "Image is expected to be 3 dimensional"
 
-        result = [img == 1, img == 2]
+        brain_label = self.labels.BRAIN
+        tumor_label = self.labels.TUMOR
+        result = [
+            img == brain_label,
+            img == tumor_label,
+        ]
         return torch.stack(result, dim=0)
 
 
 class ConvertToMultiChannelBasedOnBtsClassesd(MapTransform):
-    """
-    Dictionary based wrapper of ConvertToMultiChannelBasedOnBtsClasses
+    """Dictionary based wrapper of ConvertToMultiChannelBasedOnBtsClasses.
 
     Converts 3 dimensional label to 4 dimensional based on the Brain Tumor
-    Classification (BTS) dataset
+    Classification (BTS) dataset.
 
-    label 1 is the brain (gray matter)
-    label 2 is the tumour
+    Label 1 is the brain and label 2 is the tumour.
     """
 
     backend = ConvertToMultiChannelBasedOnBtsClasses.backend
@@ -66,16 +86,16 @@ class ConvertToMultiChannelBasedOnBtsClassesd(MapTransform):
 
 
 class BrainTumourSegmentationEchidnaDataset(Dataset):
-    """BTS Echidna Dataset that contains 8 t1w annotated images
+    """BTS Echidna Dataset that contains 8 t1w annotated images.
 
     This dataset is constructed to be a demo dataset for the initial starting
     point of the project. It contains annotated t1w images of 8 patients. Each
     sample has 3 classes (with their class indexes):
         0. Background
-        1. Brain (not a specfic part, includes gray and white matter)
+        1. Brain
         2. Tumour
 
-    *The resolution of samples are not consistent.
+    Note: The resolution of samples are not consistent.
 
     Image Shape: (H,W,D)
     Label Shape: (H,W,D)
@@ -97,7 +117,8 @@ class BrainTumourSegmentationEchidnaDataset(Dataset):
     ) -> None:
         self.root_path = dataset_root_path
         self.n_samples = 8
-        self.n_classes = 3
+        self.labels = read_local_labels()
+        self.n_classes = len(self.labels)
 
         if not os.path.isdir(dataset_root_path):
             raise ValueError(f"{dataset_root_path} is not a valid dataset path")
@@ -116,19 +137,22 @@ class BrainTumourSegmentationEchidnaDataset(Dataset):
         Dataset.__init__(self, data=data_paths, transform=transform, **kwargs)
 
     def get_num_classes(self) -> int:
-        """Get number of classes
+        """Get number of classes.
 
         Returns:
-            int: Number of classes
+            Number of classes.
         """
         return self.n_classes
 
     def _generate_data_paths(self) -> List[Dict[str, str]]:
-        """Generate data paths for image, label and info files
+        """Generate data paths for image, label and info files.
 
         Returns:
-            List[Dict[str, str]]: List of sample file paths, keys for each file
-            are img, label and info
+            List of samples structured as a dictionary. Each sample have the following
+            keys:
+                img: Path to image nrrd file.
+                label: Path to the labels nrrd file.
+                info: Path to the metadata json file.
         """
         data_paths = []
 

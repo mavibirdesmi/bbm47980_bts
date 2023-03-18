@@ -33,7 +33,7 @@ class JsonTransform(MapTransform):
         return data
 
 
-class ConvertToMultiChannelBasedOnBtsClasses(Transform):
+class ConvertToMultiChannelBasedOnEchidnaClasses(Transform):
     """Converts 3 dimensional label to 4 dimensional based on the Brain Tumor
     Classification (BTS) dataset.
 
@@ -62,7 +62,7 @@ class ConvertToMultiChannelBasedOnBtsClasses(Transform):
         return torch.stack(result, dim=0)
 
 
-class ConvertToMultiChannelBasedOnBtsClassesd(MapTransform):
+class ConvertToMultiChannelBasedOnEchidnaClassesd(MapTransform):
     """Dictionary based wrapper of ConvertToMultiChannelBasedOnBtsClasses.
 
     Converts 3 dimensional label to 4 dimensional based on the Brain Tumor
@@ -71,11 +71,11 @@ class ConvertToMultiChannelBasedOnBtsClassesd(MapTransform):
     Label 1 is the brain and label 2 is the tumour.
     """
 
-    backend = ConvertToMultiChannelBasedOnBtsClasses.backend
+    backend = ConvertToMultiChannelBasedOnEchidnaClasses.backend
 
     def __init__(self, keys: KeysCollection, allow_missing_keys: bool = False):
         super().__init__(keys, allow_missing_keys)
-        self.converter = ConvertToMultiChannelBasedOnBtsClasses()
+        self.converter = ConvertToMultiChannelBasedOnEchidnaClasses()
 
     def __call__(self, data):
         data_dict = dict(data)
@@ -85,7 +85,7 @@ class ConvertToMultiChannelBasedOnBtsClassesd(MapTransform):
         return data_dict
 
 
-class BrainTumourSegmentationEchidnaDataset(Dataset):
+class EchidnaDataset(Dataset):
     """BTS Echidna Dataset that contains 8 t1w annotated images.
 
     This dataset is constructed to be a demo dataset for the initial starting
@@ -129,7 +129,7 @@ class BrainTumourSegmentationEchidnaDataset(Dataset):
             transform = Compose(
                 [
                     LoadImaged(["img", "label"], reader="NrrdReader"),
-                    ConvertToMultiChannelBasedOnBtsClassesd(["label"]),
+                    ConvertToMultiChannelBasedOnEchidnaClassesd(["label"]),
                     JsonTransform(["info"]),
                 ]
             )

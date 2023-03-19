@@ -1,18 +1,24 @@
 import argparse
 from functools import partial
-from typing import Dict, Optional, Union
+from os.path import join
+from typing import Any, Dict, Optional, Union
 
 import torch
 from monai.data import decollate_batch
 from monai.inferers import sliding_window_inference
 from monai.losses.dice import DiceLoss
 from monai.metrics import DiceMetric
-from monai.transforms import Activations, AsDiscrete
+from monai.transforms import Activations, AsDiscrete, Compose, LoadImaged
 from torch.utils.data import DataLoader
 
 from bts.common import logutils, miscutils
 from bts.common.miscutils import DotConfig
-from bts.data.dummydataset import get_dataloader
+from bts.data.dataset import (
+    ConvertToMultiChannelBasedOnEchidnaClassesd,
+    EchidnaDataset,
+    JsonTransform,
+)
+from bts.data.utils import UnsqueezeDatad, save_prediction_as_nrrd
 from bts.swinunetr import model as smodel
 
 logger = logutils.get_logger(__name__)
@@ -36,7 +42,10 @@ def get_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--output", type=str, required=True, help="Path to save the trained model."
+        "--output-dir",
+        type=str,
+        required=True,
+        help="Path to save the the predictions.",
     )
 
     return parser.parse_args()
@@ -51,6 +60,7 @@ def test(
     overlap: int,
     labels: DotConfig[str, DotConfig[str, int]],
     device: Optional[torch.device] = None,
+    output_dir: Optional[str] = None,
 ) -> Dict[str, Union[float, torch.Tensor]]:
     """Tests the given model.
 
@@ -67,6 +77,8 @@ def test(
         epoch: Epoch number. Only used in the progress bar to display the current epoch.
         device: Device to load the model and data into. Defaults to None. If set to None
             will be set to ``cuda`` if it is available, else will be set to ``cpu``.
+        output_dir: Path to save the predictions into. If not set, will create and use
+            the ``predictions`` in the working directory.
 
     Raises:
         AssertionError: If labels does not have either of `BRAIN` and `TUMOR` keys.
@@ -109,6 +121,8 @@ def test(
             batch_data: Dict[str, torch.Tensor]
             image = batch_data["image"].to(device)
             label = batch_data["label"].to(device)
+            info: Dict[str, Any] = batch_data["info"]
+            meta_dict: Dict[str, Any] = batch_data["img_meta_dict"]
 
             logits = model_inferer(image)
 
@@ -146,6 +160,17 @@ def test(
                 "Mean Test Loss": test_loss,
             }
 
+            for sample_idx, sample_pred in enumerate(preds):
+                save_prediction_as_nrrd(
+                    sample_pred[0],
+                    sample_idx,
+                    join(
+                        output_dir,
+                        f"{info['patient_name'][sample_idx]}_prediction.nrrd",
+                    ),
+                    meta_dict=meta_dict,
+                )
+
             pbar.log_metrics(metrics)
 
     history = {
@@ -155,6 +180,22 @@ def test(
     }
 
     return history
+
+
+def get_test_dataset(dataset_path) -> EchidnaDataset:
+    dataset = EchidnaDataset(
+        dataset_root_path=dataset_path,
+        transform=Compose(
+            [
+                LoadImaged(["img", "label"], reader="NrrdReader"),
+                UnsqueezeDatad(["img"]),
+                ConvertToMultiChannelBasedOnEchidnaClassesd(["label"]),
+                JsonTransform(["info"]),
+            ]
+        ),
+    )
+
+    return dataset
 
 
 def main():
@@ -177,13 +218,15 @@ def main():
     # dice_loss = DiceLoss(to_onehot_y=False, softmax=True)
     dice_loss = DiceLoss(include_background=True, to_onehot_y=False, softmax=True)
 
-    test_loader = get_dataloader()
+    dataset = get_test_dataset()
+
+    loader = DataLoader(dataset=dataset, batch_size=hyperparams.BATCH_SIZE)
 
     logger.info("Starting test")
 
     history = test(
         model,
-        loader=test_loader,
+        loader=loader,
         loss_function=dice_loss,
         roi_size=hyperparams.ROI,
         sw_batch_size=hyperparams.SW_BATCH_SIZE,

@@ -22,7 +22,7 @@ def save_prediction_as_nrrd(
             (e.g. 3D Slicer) with the original image. Defaults to None.
 
     Example:
-    ```
+    ```py
     >>  prediction = model(sample['img'])
     >>  for i, sample_pred in enumerate(prediction):
             save_prediction_as_nrrd(

@@ -1,4 +1,4 @@
-from typing import IO, Any, Dict, Union
+from typing import IO, Any, Dict, Optional, Union
 
 import nrrd
 import torch
@@ -8,18 +8,18 @@ def save_prediction_as_nrrd(
     prediction: torch.Tensor,
     index_in_batch: int,
     file: Union[str, IO],
-    meta_dict: Dict[str, Any] = None,
+    meta_dict: Optional[Dict[str, Any]] = None,
 ):
-    """Saves the tensor prediction as nrrd file
+    """Saves the tensor prediction as nrrd file.
 
     Args:
-        prediction (torch.Tensor): Prediction from the model
-        index_in_batch (int): Index of the sample to be saved, this is needed due
-        to how meta_dict is constructed while being collated
-        file (Union[str, IO]): File path or IO to be used for saving the prediction
-        meta_dict (Dict[str, Any], optional): If given, a header is created from
+        prediction: Prediction from the model.
+        index_in_batch: Index of the sample to be saved, this is needed due
+            to how meta_dict is constructed while being collated.
+        file: File path or IO to be used for saving the prediction.
+        meta_dict: If given, a header is created from.
         the meta_dict values. This option is suggested if you want to view predictions
-         in applications (e.g. 3D Slicer) with the original image. Defaults to None.
+            in applications (e.g. 3D Slicer) with the original image. Defaults to None.
 
     Example:
     ```
@@ -33,10 +33,7 @@ def save_prediction_as_nrrd(
             )
     ```
     """
-    if prediction.is_cuda:
-        prediction = prediction.cpu()
-
-    prediction_numpy = prediction.numpy()
+    prediction = prediction.cpu().numpy()
 
     # convert meta dict to suitable header
     prediction_header = {
@@ -47,4 +44,4 @@ def save_prediction_as_nrrd(
         "space directions": meta_dict["affine"][index_in_batch, :3, :3].numpy(),
         "space origin": meta_dict["affine"][index_in_batch, :3, -1].numpy(),
     }
-    nrrd.write(file=file, data=prediction_numpy, header=prediction_header)
+    nrrd.write(file=file, data=prediction, header=prediction_header)

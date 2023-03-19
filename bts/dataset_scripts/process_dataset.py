@@ -118,6 +118,7 @@ if __name__ == "__main__":
             args.label_tumour,
             args.tumour_0th_axis_idx,
         )
+        header["kinds"] = ["domain" for _ in range(3)]
 
     print(f"Finished processing, writing to {path.parent}/transformed_label.nrrd")
     transformed_data

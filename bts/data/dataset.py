@@ -137,6 +137,11 @@ class EchidnaDataset(Dataset):
     def _generate_data_paths(self) -> List[Dict[str, str]]:
         """Generate data paths for image, label and info files.
 
+        Each sample should have the following files in its directory:
+            image.nrrd: Image.
+            label.nrrd: Segmentation labels.
+            info.json: Sample metadata.
+
         Returns:
             List of samples structured as a dictionary. Each sample have the following
             keys:

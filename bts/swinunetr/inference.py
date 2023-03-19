@@ -1,4 +1,5 @@
 import argparse
+import os
 from functools import partial
 from os.path import join
 from typing import Any, Dict, Optional, Union
@@ -32,6 +33,12 @@ def get_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--data-dir",
+        type=str,
+        required=True,
+        help="Path to dataset directory.",
+    )
+    parser.add_argument(
         "--hyperparameters",
         type=str,
         help=(
@@ -44,7 +51,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=str,
-        required=True,
+        required=False,
         help="Path to save the the predictions.",
     )
 
@@ -97,6 +104,11 @@ def test(
         device = "cuda" if torch.cuda.is_available() else "cpu"
         device = torch.device(device)
 
+    if not output_dir:
+        output_dir = "predictions"
+
+    os.makedirs(output_dir, exist_ok=True)
+
     model = model.to(device)
     model.eval()
 
@@ -114,12 +126,12 @@ def test(
     test_loss = miscutils.AverageMeter()
 
     post_softmax = Activations(softmax=True)
-    post_pred = AsDiscrete(argmax=True)
+    post_pred = AsDiscrete(argmax=True, to_onehot=2)
 
     with torch.no_grad(), logutils.etqdm(loader) as pbar:
         for batch_data in pbar:
             batch_data: Dict[str, torch.Tensor]
-            image = batch_data["image"].to(device)
+            image = batch_data["img"].to(device)
             label = batch_data["label"].to(device)
             info: Dict[str, Any] = batch_data["info"]
             meta_dict: Dict[str, Any] = batch_data["img_meta_dict"]
@@ -135,7 +147,7 @@ def test(
                 ]
             )
 
-            loss: torch.Tensor = loss_function(logits, preds)
+            loss: torch.Tensor = loss_function(input=preds, target=label)
             loss = loss.item()
 
             test_loss.update(loss, image.size(0))
@@ -143,26 +155,27 @@ def test(
             dice_metric.reset()
             dice_metric(y_pred=preds, y=batch_labels)
 
-            accuracy = dice_metric.aggregate()
-            test_loss.update(accuracy, image.size(0))
-
-            num_gt_labels = len(labels)
-            num_pred_labels = accuracy.numel()
-            assert num_gt_labels == num_pred_labels, (
-                f"Number of labels should match with the number of prediction labels. "
-                f"Found num labels: '{num_gt_labels}' != "
-                f"num prediction labels: '{num_pred_labels}' "
-            )
+            accuracy = dice_metric.aggregate().cpu().numpy()
+            test_accuracy.update(accuracy, image.size(0))
 
             metrics = {
                 "Mean Test Brain Acc.": accuracy[labels.BRAIN],
                 "Mean Test Tumor Acc.": accuracy[labels.TUMOR],
-                "Mean Test Loss": test_loss,
+                "Mean Test Loss": loss,
             }
 
             for sample_idx, sample_pred in enumerate(preds):
+                # Sample pred is in one-hot
+                # Add background
+                # TODO how to add background?
+                # Need to be fixed at dataset level
+
+                # Convert it to multilabel
+                sample_pred = torch.argmax(sample_pred, dim=0)
+                logger.info(sample_pred.shape)
+                logger.info(sample_pred.unique())
                 save_prediction_as_nrrd(
-                    sample_pred[0],
+                    sample_pred,
                     sample_idx,
                     join(
                         output_dir,
@@ -176,7 +189,7 @@ def test(
     history = {
         "Mean Brain Acc.": test_accuracy.avg[labels.BRAIN],
         "Mean Tumor Acc.": test_accuracy.avg[labels.TUMOR],
-        "Mean Loss": test_accuracy.avg,
+        "Mean Loss": test_loss.avg,
     }
 
     return history
@@ -216,9 +229,9 @@ def main():
     model = torch.nn.DataParallel(model)
 
     # dice_loss = DiceLoss(to_onehot_y=False, softmax=True)
-    dice_loss = DiceLoss(include_background=True, to_onehot_y=False, softmax=True)
+    dice_loss = DiceLoss(include_background=False)
 
-    dataset = get_test_dataset()
+    dataset = get_test_dataset(args.data_dir)
 
     loader = DataLoader(dataset=dataset, batch_size=hyperparams.BATCH_SIZE)
 
@@ -240,9 +253,9 @@ def main():
     tumor_acc = history["Mean Tumor Acc."]
 
     logger.info(
-        f"Mean Val Loss: {loss} "
-        f"Mean Val Brain Acc.: {brain_acc} "
-        f"Mean Val Tumor Acc.: {tumor_acc} "
+        f"Mean Val Loss: {round(loss, 3)} "
+        f"Mean Val Brain Acc.: {round(brain_acc, 3)} "
+        f"Mean Val Tumor Acc.: {round(tumor_acc, 3)} "
     )
 
 

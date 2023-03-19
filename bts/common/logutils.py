@@ -61,8 +61,10 @@ class etqdm(tqdm):
         Raises:
             AssertionError: If the epoch parameter is not an integer.
         """
-        assert isinstance(epoch, int), "Epoch must be an integer value!"
+        if epoch:
+            assert isinstance(epoch, int), "Epoch must be an integer value!"
         desc = None
+        self.disable = None
         if epoch:
             desc = f"Epoch {epoch}"
         super().__init__(*args, **kwargs, desc=desc)

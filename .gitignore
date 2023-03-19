@@ -8,7 +8,7 @@ __pycache__
 .env
 
 # Poetry
-poetry.lock
+# poetry.lock
 .venv
 
 # Wandb artifacts

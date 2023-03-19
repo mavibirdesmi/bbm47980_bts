@@ -4,7 +4,7 @@ from .dataset import (
     EchidnaDataset,
     JsonTransform,
 )
-from .datautils import save_prediction_as_nrrd
+from .utils import save_prediction_as_nrrd
 
 __all__ = [
     "EchidnaDataset",

@@ -1,25 +1,19 @@
 from functools import partial
 from os.path import join as osjoin
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import torch
 from monai.data import DataLoader, decollate_batch
 from monai.inferers import sliding_window_inference
-from monai.transforms import (
-    Activations,
-    AsDiscrete,
-    Compose,
-    LoadImaged,
-    MapTransform,
-    Transform,
-)
+from monai.transforms import Activations, AsDiscrete, Compose, LoadImaged
 
 from bts.data import (
-    BrainTumourSegmentationEchidnaDataset,
-    ConvertToMultiChannelBasedOnBtsClassesd,
+    ConvertToMultiChannelBasedOnEchidnaClassesd,
+    EchidnaDataset,
     JsonTransform,
     save_prediction_as_nrrd,
 )
+from bts.data.utils import UnsqueezeDatad
 from bts.swinunetr.model import get_model
 
 SPATIAL_SIZE = (128, 128, 128)
@@ -29,31 +23,13 @@ DEVICE = "cuda"
 PREDICTION_DIR = "/home/desmin/grad_project/predictions"
 
 
-class UnsqueezeData(Transform):
-    def __call__(self, data: torch.Tensor):
-        return torch.unsqueeze(data, 0)
-
-
-class UnsqueezeDatad(MapTransform):
-    def __init__(self, keys: List, allow_missing_keys: bool = False):
-        super().__init__(keys, allow_missing_keys)
-        self.converter = UnsqueezeData()
-
-    def __call__(self, data):
-        data_dict = dict(data)
-        for key in self.key_iterator(data_dict):
-            data_dict[key] = self.converter(data_dict[key])
-
-        return data_dict
-
-
-dataset = BrainTumourSegmentationEchidnaDataset(
+dataset = EchidnaDataset(
     dataset_root_path=DATASET_PATH,
     transform=Compose(
         [
             LoadImaged(["img", "label"], reader="NrrdReader"),
             UnsqueezeDatad(["img"]),
-            ConvertToMultiChannelBasedOnBtsClassesd(["label"]),
+            ConvertToMultiChannelBasedOnEchidnaClassesd(["label"]),
             # for training
             # RandSpatialCropd(
             # ["img", "label"], roi_size=SPATIAL_SIZE, random_size=False),

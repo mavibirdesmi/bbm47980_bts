@@ -1,7 +1,26 @@
-from typing import IO, Any, Dict, Optional, Union
+from typing import IO, Any, Dict, List, Optional, Union
 
 import nrrd
 import torch
+from monai.transforms import MapTransform, Transform
+
+
+class UnsqueezeData(Transform):
+    def __call__(self, data: torch.Tensor):
+        return torch.unsqueeze(data, 0)
+
+
+class UnsqueezeDatad(MapTransform):
+    def __init__(self, keys: List, allow_missing_keys: bool = False):
+        super().__init__(keys, allow_missing_keys)
+        self.converter = UnsqueezeData()
+
+    def __call__(self, data):
+        data_dict = dict(data)
+        for key in self.key_iterator(data_dict):
+            data_dict[key] = self.converter(data_dict[key])
+
+        return data_dict
 
 
 def save_prediction_as_nrrd(

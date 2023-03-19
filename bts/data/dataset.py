@@ -140,8 +140,8 @@ class EchidnaDataset(Dataset):
         Returns:
             List of samples structured as a dictionary. Each sample have the following
             keys:
-                img: Path to image nrrd file.
-                label: Path to the labels nrrd file.
+                img: Path to the image nrrd file.
+                label: Path to the label nrrd file.
                 info: Path to the metadata json file.
         """
         data_paths = []

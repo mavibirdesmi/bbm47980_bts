@@ -95,7 +95,8 @@ class EchidnaDataset(Dataset):
         1. Brain
         2. Tumour
 
-    Note: The resolution of samples are not consistent.
+    Note: The resolution of samples are not consistent. Resizing is needed if they will
+    be used as batch inputs.
 
     Image Shape: (H,W,D)
     Label Shape: (H,W,D)

@@ -9,6 +9,12 @@ readme = "README.md"
 python = "^3.9"
 monai = "1.1.0"
 pynrrd = "^1.0.0"
+pyyaml = "^6.0"
+tqdm = "^4.65.0"
+jupyter = "^1.0.0"
+ipykernel = "^6.21.3"
+pre-commit = "^3.2.0"
+einops = "^0.6.0"
 
 
 [build-system]

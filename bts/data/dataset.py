@@ -100,17 +100,6 @@ class EchidnaDataset(Dataset):
 
     Image Shape: (H,W,D)
     Label Shape: (H,W,D)
-
-    Example:
-    ```py
-        dataset = BrainTumourSegmentationEchidnaDataset(
-            dataset_root_path="/path/to/dataset"
-        )
-        d_loader = DataLoader(dataset=dataset)
-        for sample in d_loader:
-            img, label, info = sample["img"], sample["label"], sample["info"]
-            # do magic
-    ```
     """
 
     def __init__(

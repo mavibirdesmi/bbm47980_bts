@@ -17,9 +17,9 @@ def save_prediction_as_nrrd(
         index_in_batch: Index of the sample to be saved, this is needed due
             to how meta_dict is constructed while being collated.
         file: File path or IO to be used for saving the prediction.
-        meta_dict: If given, a header is created from.
-        the meta_dict values. This option is suggested if you want to view predictions
-            in applications (e.g. 3D Slicer) with the original image. Defaults to None.
+        meta_dict: If given, a header is created from the meta_dict values. This option
+            is suggested if you want to view predictions in applications
+            (e.g. 3D Slicer) with the original image. Defaults to None.
 
     Example:
     ```

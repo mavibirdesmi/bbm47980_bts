@@ -4,22 +4,16 @@ from functools import partial
 from os.path import join
 from typing import Any, Dict, Optional, Union
 
+import numpy as np
 import torch
-from monai.data import decollate_batch
 from monai.inferers import sliding_window_inference
-from monai.losses.dice import DiceLoss
-from monai.metrics import DiceMetric
-from monai.transforms import Activations, AsDiscrete, Compose, LoadImaged
+from monai.transforms import Activations, AsDiscrete
 from torch.utils.data import DataLoader
 
 from bts.common import logutils, miscutils
 from bts.common.miscutils import DotConfig
-from bts.data.dataset import (
-    ConvertToMultiChannelBasedOnEchidnaClassesd,
-    EchidnaDataset,
-    JsonTransform,
-)
-from bts.data.utils import UnsqueezeDatad, save_prediction_as_nrrd
+from bts.data.dataset import get_test_dataset
+from bts.data.utils import save_prediction_as_nrrd
 from bts.swinunetr import model as smodel
 
 logger = logutils.get_logger(__name__)
@@ -37,6 +31,12 @@ def get_args() -> argparse.Namespace:
         type=str,
         required=True,
         help="Path to dataset directory.",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        required=True,
+        help="Path to trained model.",
     )
     parser.add_argument(
         "--hyperparameters",
@@ -61,11 +61,10 @@ def get_args() -> argparse.Namespace:
 def test(
     model: torch.nn.Module,
     loader: DataLoader,
-    loss_function: torch.nn.modules.loss._Loss,
     roi_size: int,
     sw_batch_size: int,
     overlap: int,
-    labels: DotConfig[str, DotConfig[str, int]],
+    labels: DotConfig[str, int],
     device: Optional[torch.device] = None,
     output_dir: Optional[str] = None,
 ) -> Dict[str, Union[float, torch.Tensor]]:
@@ -75,7 +74,6 @@ def test(
         model: Model to test.
         loader: Data loader.
             The batch data should be a dictionary containing "image" and "label" keys.
-        loss_function: Loss function to measure the loss during the validation.
         roi_size: The spatial window size for inferences.
         sw_batch_size: The batch size to run window slices.
         overlap: Amount of overlap between scans.
@@ -120,101 +118,59 @@ def test(
         overlap=overlap,
     )
 
-    dice_metric = DiceMetric(include_background=True, reduction="mean_batch")
-
-    test_accuracy = miscutils.AverageMeter()
-    test_loss = miscutils.AverageMeter()
-
-    post_softmax = Activations(softmax=True)
-    post_pred = AsDiscrete(argmax=True, to_onehot=2)
+    post_softmax = Activations(sigmoid=True)
+    post_pred = AsDiscrete(threshold=0.5, dtype="int8")
 
     with torch.no_grad(), logutils.etqdm(loader) as pbar:
         for batch_data in pbar:
             batch_data: Dict[str, torch.Tensor]
             image = batch_data["img"].to(device)
-            label = batch_data["label"].to(device)
             info: Dict[str, Any] = batch_data["info"]
             meta_dict: Dict[str, Any] = batch_data["img_meta_dict"]
 
             logits = model_inferer(image)
 
-            batch_labels = decollate_batch(label)
-            outputs = decollate_batch(logits)
-            preds = torch.stack(
-                [
-                    post_pred(post_softmax(val_pred_tensor))
-                    for val_pred_tensor in outputs
-                ]
+            seg = post_pred(post_softmax(logits[0])).detach().cpu().numpy()
+            seg = one_hot_to_discrete(seg, labels)
+
+            save_prediction_as_nrrd(
+                seg,
+                0,
+                join(
+                    output_dir,
+                    f"{info['patient_name'][0]}_prediction.nrrd",
+                ),
+                meta_dict=meta_dict,
             )
 
-            loss: torch.Tensor = loss_function(input=preds, target=label)
-            loss = loss.item()
 
-            test_loss.update(loss, image.size(0))
+def one_hot_to_discrete(
+    target: Union[torch.Tensor, np.ndarray], labels: DotConfig[str, str]
+) -> np.ndarray:
+    """Transform tensor in the one hot form to the discrete form.
 
-            dice_metric.reset()
-            dice_metric(y_pred=preds, y=batch_labels)
+    Args:
+        target: Tensor to transform. Expected shape is (L, H, W, D) where L is the
+            number of labels.
+        labels: Labels to use in transformation
 
-            accuracy = dice_metric.aggregate().cpu().numpy()
-            test_accuracy.update(accuracy, image.size(0))
+    Returns:
+        Discrete transformed array, with `int8` dtype.
+    """
+    L, H, W, D = target.shape
+    target_discrete = np.ones((H, W, D), dtype=np.int8) * labels.GROUND
 
-            metrics = {
-                "Mean Test Brain Acc.": accuracy[labels.BRAIN],
-                "Mean Test Tumor Acc.": accuracy[labels.TUMOR],
-                "Mean Test Loss": loss,
-            }
+    target_discrete[target[0] == 1] = labels.BRAIN
+    target_discrete[target[1] == 1] = labels.TUMOR
 
-            for sample_idx, sample_pred in enumerate(preds):
-                # Sample pred is in one-hot
-                # Add background
-                # TODO how to add background?
-                # Need to be fixed at dataset level
-
-                # Convert it to multilabel
-                sample_pred = torch.argmax(sample_pred, dim=0)
-                logger.info(sample_pred.shape)
-                logger.info(sample_pred.unique())
-                save_prediction_as_nrrd(
-                    sample_pred,
-                    sample_idx,
-                    join(
-                        output_dir,
-                        f"{info['patient_name'][sample_idx]}_prediction.nrrd",
-                    ),
-                    meta_dict=meta_dict,
-                )
-
-            pbar.log_metrics(metrics)
-
-    history = {
-        "Mean Brain Acc.": test_accuracy.avg[labels.BRAIN],
-        "Mean Tumor Acc.": test_accuracy.avg[labels.TUMOR],
-        "Mean Loss": test_loss.avg,
-    }
-
-    return history
-
-
-def get_test_dataset(dataset_path) -> EchidnaDataset:
-    dataset = EchidnaDataset(
-        dataset_root_path=dataset_path,
-        transform=Compose(
-            [
-                LoadImaged(["img", "label"], reader="NrrdReader"),
-                UnsqueezeDatad(["img"]),
-                ConvertToMultiChannelBasedOnEchidnaClassesd(["label"]),
-                JsonTransform(["info"]),
-            ]
-        ),
-    )
-
-    return dataset
+    return target_discrete
 
 
 def main():
     args = get_args()
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
+    assert hyperparams.BATCH_SIZE == 1, "Inference only works with batch size of one!"
 
     smodel.set_cudnn_benchmark()
 
@@ -226,36 +182,26 @@ def main():
         use_checkpoint=hyperparams.GRADIENT_CHECKPOINT,
     )
 
-    model = torch.nn.DataParallel(model)
+    checkpoint = torch.load(args.model)
 
-    # dice_loss = DiceLoss(to_onehot_y=False, softmax=True)
-    dice_loss = DiceLoss(include_background=False)
+    model.load_state_dict(checkpoint["state_dict"], strict=False)
+
+    model = torch.nn.DataParallel(model)
 
     dataset = get_test_dataset(args.data_dir)
 
     loader = DataLoader(dataset=dataset, batch_size=hyperparams.BATCH_SIZE)
 
-    logger.info("Starting test")
+    logger.info("Starting test.")
 
-    history = test(
+    test(
         model,
         loader=loader,
-        loss_function=dice_loss,
         roi_size=hyperparams.ROI,
         sw_batch_size=hyperparams.SW_BATCH_SIZE,
         overlap=hyperparams.INFER_OVERLAP,
         labels=hyperparams.LABELS,
         device=hyperparams.DEVICE,
-    )
-
-    loss = history["Mean Loss"]
-    brain_acc = history["Mean Brain Acc."]
-    tumor_acc = history["Mean Tumor Acc."]
-
-    logger.info(
-        f"Mean Val Loss: {round(loss, 3)} "
-        f"Mean Val Brain Acc.: {round(brain_acc, 3)} "
-        f"Mean Val Tumor Acc.: {round(tumor_acc, 3)} "
     )
 
 

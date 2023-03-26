@@ -42,5 +42,5 @@ def get_model(
 def set_cudnn_benchmark():
     """Causes cuDNN to benchmark multiple convolution algorithms and select the
     fastest."""
-    logger.info("Enabling cuDNN benchmark")
+    logger.info("Enabling cuDNN benchmark.")
     torch.backends.cudnn.benchmark = True

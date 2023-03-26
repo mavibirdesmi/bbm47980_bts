@@ -6,10 +6,19 @@ import torch
 import yaml
 from monai.config import KeysCollection
 from monai.data import Dataset
-from monai.transforms import Compose, LoadImaged, MapTransform, Transform
+from monai.transforms import (
+    Compose,
+    LoadImaged,
+    MapTransform,
+    NormalizeIntensityd,
+    RandFlipd,
+    RandSpatialCropd,
+    Transform,
+)
 from monai.utils.enums import TransformBackends
 
 from bts.common.miscutils import DotConfig
+from bts.data.utils import UnsqueezeDatad
 
 
 def read_local_labels() -> DotConfig[str, int]:
@@ -50,6 +59,10 @@ class ConvertToMultiChannelBasedOnEchidnaClasses(Transform):
         self.labels = read_local_labels()
 
     def __call__(self, img: torch.Tensor):
+        # if img has channel dim, squeeze it
+        # if img.ndim == 4 and img.shape[0] == 1:
+        #    img = img.squeeze(0)
+
         # expected ndim is 3
         assert img.ndim == 3, "Image is expected to be 3 dimensional"
 
@@ -162,3 +175,67 @@ class EchidnaDataset(Dataset):
             data_paths.append(sample_data_paths)
 
         return data_paths
+
+
+def get_test_dataset(dataset_path) -> EchidnaDataset:
+    dataset = EchidnaDataset(
+        dataset_root_path=dataset_path,
+        transform=Compose(
+            [
+                LoadImaged(["img", "label"], reader="NrrdReader"),
+                UnsqueezeDatad(["img"]),
+                ConvertToMultiChannelBasedOnEchidnaClassesd(["label"]),
+                JsonTransform(["info"]),
+                NormalizeIntensityd(keys="img", nonzero=True, channel_wise=True),
+            ]
+        ),
+    )
+
+    return dataset
+
+
+def get_train_dataset(dataset_path) -> EchidnaDataset:
+    dataset = EchidnaDataset(
+        dataset_root_path=dataset_path,
+        transform=Compose(
+            [
+                LoadImaged(["img", "label"], reader="NrrdReader"),
+                UnsqueezeDatad(["img"]),
+                ConvertToMultiChannelBasedOnEchidnaClassesd(["label"]),
+                JsonTransform(["info"]),
+                RandSpatialCropd(
+                    keys=["img", "label"],
+                    roi_size=[128, 128, 128],
+                    random_size=False,
+                ),
+                RandFlipd(keys=["img", "label"], prob=0.5, spatial_axis=0),
+                RandFlipd(keys=["img", "label"], prob=0.5, spatial_axis=1),
+                RandFlipd(keys=["img", "label"], prob=0.5, spatial_axis=2),
+                NormalizeIntensityd(keys="img", nonzero=True, channel_wise=True),
+            ]
+        ),
+    )
+
+    return dataset
+
+
+def get_val_dataset(dataset_path) -> EchidnaDataset:
+    dataset = EchidnaDataset(
+        dataset_root_path=dataset_path,
+        transform=Compose(
+            [
+                LoadImaged(["img", "label"], reader="NrrdReader"),
+                UnsqueezeDatad(["img"]),
+                ConvertToMultiChannelBasedOnEchidnaClassesd(["label"]),
+                JsonTransform(["info"]),
+                RandSpatialCropd(
+                    keys=["img", "label"],
+                    roi_size=[128, 128, 128],
+                    random_size=False,
+                ),
+                NormalizeIntensityd(keys="img", nonzero=True, channel_wise=True),
+            ]
+        ),
+    )
+
+    return dataset

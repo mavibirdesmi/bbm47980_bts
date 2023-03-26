@@ -1,6 +1,7 @@
 import os
-from typing import Generic, Optional, TypeVar, Union
+from typing import Any, Dict, Generic, Optional, TypeVar, Union
 
+import numpy as np
 import torch
 import yaml
 
@@ -30,6 +31,14 @@ class DotConfig(Generic[K, V]):
 
     def __len__(self) -> int:
         return len(vars(self))
+
+    def to_dict(self) -> Dict[Any, Any]:
+        dict_repr = vars(self).copy()
+        for key, value in dict_repr.items():
+            if isinstance(value, DotConfig):
+                dict_repr[key] = value.to_dict()
+
+        return dict_repr
 
 
 def load_hyperparameters(path: Optional[str] = None) -> DotConfig:
@@ -71,4 +80,40 @@ class AverageMeter(object):
         self.val: Union[int, float, torch.Tensor] = val
         self.sum: Union[int, float, torch.Tensor] = self.sum + val * n
         self.count: Union[int, float, torch.Tensor] = self.count + n
-        self.avg: Union[int, float, torch.Tensor] = self.sum / self.count
+        self.avg: Union[int, float, torch.Tensor] = np.where(
+            self.count > 0, self.sum / self.count, self.sum
+        )
+
+
+def save_checkpoint(
+    model: torch.nn.Module,
+    save_dir: str,
+    epoch: Optional[int] = None,
+    best_acc: Optional[int] = None,
+):
+    """Save model checkpoint in the given directory, with `model.pt` name.
+
+    Args:
+        model: Trained model.
+        save_dir: Directory to save the model checkpoint.
+        epoch: Epoch number. Stored to the model state dictionary.
+            Defaults to `None`.
+        best_acc: Best accuracy. Stored to the model state dictionary.
+            Defaults to `None`.
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir, exist_ok=True)
+
+    state_dict = model.state_dict()
+    save_dict = {"state_dict": state_dict}
+
+    if epoch:
+        save_dict["epoch"] = epoch
+
+    if best_acc:
+        save_dict["best_acc"] = best_acc
+
+    checkpoint_path = os.path.join(save_dir, "model.pt")
+    logger.info(f"Saving checkpoint to {checkpoint_path}")
+
+    torch.save(save_dict, checkpoint_path)

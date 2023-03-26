@@ -13,3 +13,5 @@ __pycache__
 
 # Wandb artifacts
 *wandb
+
+*.log

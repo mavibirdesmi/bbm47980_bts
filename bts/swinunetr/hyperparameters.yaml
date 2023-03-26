@@ -1,4 +1,4 @@
-BATCH_SIZE: 1
+BATCH_SIZE: 2
 
 SHUFFLE: true
 
@@ -11,7 +11,7 @@ FEATURE_SIZE: 48
 
 GRADIENT_CHECKPOINT: TRUE
 
-EPOCHS: 100
+EPOCHS: 50000
 FOLD: 1
 
 # Batch size to run window slices
@@ -20,7 +20,7 @@ SW_BATCH_SIZE: 2
 # 1e-4
 LEARNING_RATE: 0.0001
 
-INFER_OVERLAP: 0.5
+INFER_OVERLAP: 0.6
 
 # 1e-5
 WEIGHT_DECAY: 0.00001
@@ -28,8 +28,6 @@ WEIGHT_DECAY: 0.00001
 DEVICE: cuda
 
 LABELS:
-  BRAIN: 0
-  TUMOR: 1
-
-# Data directory should contain
-DATA_DIR: "../../data"
+  GROUND: 0
+  BRAIN: 1
+  TUMOR: 2

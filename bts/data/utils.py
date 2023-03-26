@@ -1,8 +1,13 @@
+import os
 from typing import IO, Any, Dict, List, Optional, Union
 
 import nrrd
 import torch
 from monai.transforms import MapTransform, Transform
+
+from bts.common import logutils
+
+logger = logutils.get_logger(__name__)
 
 
 class UnsqueezeData(Transform):
@@ -52,7 +57,9 @@ def save_prediction_as_nrrd(
             )
     ```
     """
-    prediction = prediction.cpu().numpy()
+    dirname = os.path.dirname(file)
+
+    os.makedirs(dirname, exist_ok=True)
 
     # convert meta dict to suitable header
     prediction_header = {
@@ -64,3 +71,25 @@ def save_prediction_as_nrrd(
         "space origin": meta_dict["affine"][index_in_batch, :3, -1].numpy(),
     }
     nrrd.write(file=file, data=prediction, header=prediction_header)
+
+
+def collate_fn(batch: Any) -> Any:
+    """Collate list of data.
+
+    Args:
+        batch: List of data.
+
+    Returns:
+        Collated data.
+    """
+    elem = batch[0]
+    coll = {}
+
+    for key in elem:
+        if key in ["img", "label"]:
+            data_for_batch = tuple(torch.as_tensor(d[key]) for d in batch)
+            coll[key] = torch.stack(data_for_batch, dim=0)
+        else:
+            coll[key] = torch.stack(data_for_batch, dim=0)
+
+    return coll

@@ -14,4 +14,8 @@ __pycache__
 # Wandb artifacts
 *wandb
 
+# Log artifacts
 *.log
+
+# Model checkpoints
+*.pt

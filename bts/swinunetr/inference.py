@@ -52,7 +52,10 @@ def get_args() -> argparse.Namespace:
         "--output-dir",
         type=str,
         required=False,
-        help="Path to save the the predictions.",
+        help=(
+            "Path to save the the predictions. If not set, will create a directory "
+            "named `predictions, and save the prediction into it."
+        ),
     )
 
     return parser.parse_args()
@@ -170,6 +173,9 @@ def main():
     args = get_args()
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
+
+    hyperparams.BATCH_SIZE = 1
+
     assert hyperparams.BATCH_SIZE == 1, "Inference only works with batch size of one!"
 
     smodel.set_cudnn_benchmark()

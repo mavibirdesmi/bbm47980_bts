@@ -11,7 +11,7 @@ FEATURE_SIZE: 48
 
 GRADIENT_CHECKPOINT: TRUE
 
-EPOCHS: 50000
+EPOCHS: 5000
 FOLD: 1
 
 # Batch size to run window slices

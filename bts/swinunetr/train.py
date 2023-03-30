@@ -9,7 +9,7 @@ from monai.metrics import DiceMetric
 from monai.transforms import Activations, AsDiscrete
 from torch.utils.data import DataLoader
 
-import wandb
+# import wandb
 from bts.common import logutils, miscutils
 from bts.common.miscutils import DotConfig, save_checkpoint
 from bts.data.dataset import get_train_dataset, get_val_dataset
@@ -228,7 +228,7 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    wandb.init(config=hyperparams.to_dict())
+    # wandb.init(config=hyperparams.to_dict())
 
     smodel.set_cudnn_benchmark()
 
@@ -273,7 +273,7 @@ def main():
 
     val_acc_max = 0.0
 
-    for epoch in range(1, hyperparams.EPOCHS):
+    for epoch in range(1, hyperparams.EPOCHS + 1):
         logger.info(f"Epoch {epoch} is starting.")
 
         train_history = train_epoch(
@@ -286,7 +286,7 @@ def main():
         )
 
         logger.info(f'Mean Train Loss: {round(train_history["Mean Train Loss"], 2)}')
-        wandb.log(train_history)
+        # wandb.log(train_history)
 
         if epoch % 250 == 0:
             val_history = val_epoch(
@@ -306,7 +306,7 @@ def main():
             val_tumor_acc = val_history["Mean Val Tumor Acc"]
             val_mean_acc = val_history["Mean Val Acc"]
 
-            wandb.log(val_history)
+            # wandb.log(val_history)
 
             if val_mean_acc > val_acc_max:
                 logger.info(

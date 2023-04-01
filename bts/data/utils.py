@@ -71,25 +71,3 @@ def save_prediction_as_nrrd(
         "space origin": meta_dict["affine"][index_in_batch, :3, -1].numpy(),
     }
     nrrd.write(file=file, data=prediction, header=prediction_header)
-
-
-def collate_fn(batch: Any) -> Any:
-    """Collate list of data.
-
-    Args:
-        batch: List of data.
-
-    Returns:
-        Collated data.
-    """
-    elem = batch[0]
-    coll = {}
-
-    for key in elem:
-        if key in ["img", "label"]:
-            data_for_batch = tuple(torch.as_tensor(d[key]) for d in batch)
-            coll[key] = torch.stack(data_for_batch, dim=0)
-        else:
-            coll[key] = torch.stack(data_for_batch, dim=0)
-
-    return coll

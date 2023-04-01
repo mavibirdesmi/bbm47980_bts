@@ -13,7 +13,6 @@ from torch.utils.data import DataLoader
 from bts.common import logutils, miscutils
 from bts.common.miscutils import DotConfig, save_checkpoint
 from bts.data.dataset import get_train_dataset, get_val_dataset
-from bts.data.utils import collate_fn
 from bts.swinunetr import model as smodel
 
 logger = logutils.get_logger(__name__)
@@ -261,14 +260,12 @@ def main():
         batch_size=hyperparams.BATCH_SIZE,
         num_workers=2,
         pin_memory=True,
-        collate_fn=collate_fn,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=hyperparams.BATCH_SIZE,
         num_workers=2,
         pin_memory=True,
-        collate_fn=collate_fn,
     )
 
     val_acc_max = 0.0

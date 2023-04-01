@@ -11,7 +11,8 @@ from monai.transforms import (
     LoadImaged,
     MapTransform,
     NormalizeIntensityd,
-    Resized,
+    RandFlipd,
+    RandSpatialCropd,
     Transform,
 )
 from monai.utils.enums import TransformBackends
@@ -199,10 +200,18 @@ def get_train_dataset(dataset_path) -> EchidnaDataset:
         transform=Compose(
             [
                 LoadImaged(["img", "label"], reader="NrrdReader"),
-                Resized(keys=["image", "label"], spatial_size=(200, 200, 200)),
                 UnsqueezeDatad(["img"]),
                 ConvertToMultiChannelBasedOnEchidnaClassesd(["label"]),
                 JsonTransform(["info"]),
+                RandSpatialCropd(
+                    keys=["img", "label"],
+                    roi_size=[128, 128, 128],
+                    random_size=False,
+                ),
+                RandFlipd(keys=["img", "label"], prob=0.5, spatial_axis=0),
+                RandFlipd(keys=["img", "label"], prob=0.5, spatial_axis=1),
+                RandFlipd(keys=["img", "label"], prob=0.5, spatial_axis=2),
+                NormalizeIntensityd(keys="img", nonzero=True, channel_wise=True),
             ]
         ),
     )
@@ -216,7 +225,6 @@ def get_val_dataset(dataset_path) -> EchidnaDataset:
         transform=Compose(
             [
                 LoadImaged(["img", "label"], reader="NrrdReader"),
-                Resized(keys=["image", "label"], spatial_size=(200, 200, 200)),
                 UnsqueezeDatad(["img"]),
                 ConvertToMultiChannelBasedOnEchidnaClassesd(["label"]),
                 JsonTransform(["info"]),

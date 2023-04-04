@@ -72,7 +72,7 @@ class ConvertToMultiChannelBasedOnEchidnaClasses(Transform):
             img == brain_label,
             img == tumor_label,
         ]
-        return torch.stack(result, dim=0)
+        return torch.stack(result, dim=0).float()
 
 
 class ConvertToMultiChannelBasedOnEchidnaClassesd(MapTransform):

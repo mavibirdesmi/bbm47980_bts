@@ -13,6 +13,7 @@ from monai.transforms import (
     NormalizeIntensityd,
     RandFlipd,
     RandSpatialCropd,
+    Resized,
     Transform,
 )
 from monai.utils.enums import TransformBackends
@@ -228,6 +229,11 @@ def get_val_dataset(dataset_path) -> EchidnaDataset:
                 UnsqueezeDatad(["img"]),
                 ConvertToMultiChannelBasedOnEchidnaClassesd(["label"]),
                 JsonTransform(["info"]),
+                Resized(
+                    keys=["img", "label"],
+                    spatial_size=[128, 128, 128],
+                ),
+                NormalizeIntensityd(keys="img", nonzero=True, channel_wise=True),
             ]
         ),
     )

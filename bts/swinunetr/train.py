@@ -4,12 +4,12 @@ from typing import Dict, Optional, Union
 
 import torch
 from monai.inferers import sliding_window_inference
-from monai.losses.dice import DiceLoss
+from monai.losses.dice import DiceCELoss, DiceLoss
 from monai.metrics import DiceMetric
 from monai.transforms import Activations, AsDiscrete
 from torch.utils.data import DataLoader
 
-# import wandb
+import wandb
 from bts.common import logutils, miscutils
 from bts.common.miscutils import DotConfig, save_checkpoint
 from bts.data.dataset import get_train_dataset, get_val_dataset
@@ -227,7 +227,7 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    # wandb.init(config=hyperparams.to_dict())
+    wandb.init(config=hyperparams.to_dict(), name="Dice")
 
     smodel.set_cudnn_benchmark()
 
@@ -242,6 +242,9 @@ def main():
     model = torch.nn.DataParallel(model)
 
     dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
+
+    # class_weights = torch.Tensor([0.1, 0.9]).to(hyperparams.DEVICE)
+    # dice_loss = DiceCELoss(to_onehot_y=False, sigmoid=True, ce_weight=class_weights)
 
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -283,7 +286,7 @@ def main():
         )
 
         logger.info(f'Mean Train Loss: {round(train_history["Mean Train Loss"], 2)}')
-        # wandb.log(train_history)
+        wandb.log(train_history)
 
         if epoch % 250 == 0:
             val_history = val_epoch(
@@ -301,9 +304,9 @@ def main():
             val_loss = val_history["Mean Val Loss"]
             val_brain_acc = val_history["Mean Val Brain Acc"]
             val_tumor_acc = val_history["Mean Val Tumor Acc"]
-            val_mean_acc = val_history["Mean Val Acc"]
+            val_mean_acc = val_history["Mean Val Tumor Acc"]
 
-            # wandb.log(val_history)
+            wandb.log(val_history)
 
             if val_mean_acc > val_acc_max:
                 logger.info(

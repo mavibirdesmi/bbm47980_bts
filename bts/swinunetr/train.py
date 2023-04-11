@@ -63,7 +63,7 @@ def train_epoch(
     Args:
         model: Model to train.
         loader: Data loader.
-            The batch data should be a dictionary containing "image" and "label" keys.
+            The batch data should be a dictionary containing "img" and "label" keys.
         loss_function: Loss function to measure the loss during the training.
         optimizer: Optimizer to optimize the loss.
         epoch: Epoch number. Only used in the progress bar to display the current epoch.
@@ -131,7 +131,7 @@ def val_epoch(
     Args:
         model: Model to evaluate.
         loader: Data loader.
-            The batch data should be a dictionary containing "image" and "label" keys.
+            The batch data should be a dictionary containing "img" and "label" keys.
         loss_function: Loss function to measure the loss during the validation.
         roi_size: The spatial window size for inferences.
         sw_batch_size: The batch size to run window slices.

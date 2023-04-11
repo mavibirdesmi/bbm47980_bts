@@ -5,7 +5,7 @@ from typing import Dict, Optional, Union
 import torch
 from monai import data
 from monai.inferers import sliding_window_inference
-from monai.losses import DiceLoss
+from monai.losses.dice import DiceCELoss, DiceLoss
 from monai.metrics import DiceMetric
 from monai.networks.nets import SwinUNETR
 from monai.transforms import Activations, AsDiscrete
@@ -64,7 +64,7 @@ def train_epoch(
     Args:
         model: Model to train.
         loader: Data loader.
-            The batch data should be a dictionary containing "image" and "label" keys.
+            The batch data should be a dictionary containing "img" and "label" keys.
         loss_function: Loss function to measure the loss during the training.
         optimizer: Optimizer to optimize the loss.
         epoch: Epoch number. Only used in the progress bar to display the current epoch.
@@ -132,7 +132,7 @@ def val_epoch(
     Args:
         model: Model to evaluate.
         loader: Data loader.
-            The batch data should be a dictionary containing "image" and "label" keys.
+            The batch data should be a dictionary containing "img" and "label" keys.
         loss_function: Loss function to measure the loss during the validation.
         roi_size: The spatial window size for inferences.
         sw_batch_size: The batch size to run window slices.

@@ -227,7 +227,7 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    wandb.init(config=hyperparams.to_dict(), name="Dice")
+    wandb.init(config=hyperparams.to_dict(), name="Cosine Scheduler Updated")
 
     smodel.set_cudnn_benchmark()
 

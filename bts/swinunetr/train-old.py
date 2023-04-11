@@ -421,6 +421,7 @@ def trainer(
     dices_avg = []
     loss_epochs = []
     trains_epoch = []
+
     for epoch in range(start_epoch, max_epochs):
         train_history = train_epoch(
             model=model,
@@ -431,7 +432,7 @@ def trainer(
         )
 
         logger.info(f'Mean Train Loss: {round(train_history["Mean Train Loss"], 2)}')
-        wandb.log(train_history)
+        wandb.log(train_history, step=epoch)
 
         if (epoch + 1) % val_every == 0 or epoch == 0:
             loss_epochs.append(train_history["Mean Train Loss"])
@@ -454,7 +455,7 @@ def trainer(
             val_tumor_acc = val_history["Mean Val Tumor Acc"]
             val_mean_acc = val_history["Mean Val Tumor Acc"]
 
-            wandb.log(val_history)
+            wandb.log(val_history, step=epoch)
 
             dices_brain.append(val_brain_acc)
             dices_tumor.append(val_tumor_acc)
@@ -470,7 +471,7 @@ def trainer(
                     best_acc=val_acc_max,
                 )
 
-            wandb.log({"Learning Rate": scheduler.get_lr()[0]})
+            wandb.log({"Learning Rate": scheduler.get_lr()[0]}, step=epoch)
             scheduler.step()
 
     print("Training Finished !, Best Accuracy: ", val_acc_max)

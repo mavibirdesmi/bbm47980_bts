@@ -273,7 +273,7 @@ def main():
 
     val_acc_max = 0.0
 
-    for epoch in range(1, hyperparams.EPOCHS + 1):
+    for epoch in range(hyperparams.EPOCHS):
         logger.info(f"Epoch {epoch} is starting.")
 
         train_history = train_epoch(
@@ -286,9 +286,9 @@ def main():
         )
 
         logger.info(f'Mean Train Loss: {round(train_history["Mean Train Loss"], 2)}')
-        wandb.log(train_history)
+        wandb.log(train_history, step=epoch)
 
-        if epoch % 250 == 0:
+        if (epoch + 1) % 250 == 0 or epoch == 0:
             val_history = val_epoch(
                 model,
                 loader=val_loader,
@@ -306,7 +306,7 @@ def main():
             val_tumor_acc = val_history["Mean Val Tumor Acc"]
             val_mean_acc = val_history["Mean Val Tumor Acc"]
 
-            wandb.log(val_history)
+            wandb.log(val_history, step=epoch)
 
             if val_mean_acc > val_acc_max:
                 logger.info(
@@ -329,7 +329,7 @@ def main():
                 f"Mean Val Tumor Acc.: {round(val_tumor_acc, 2)} "
             )
 
-        wandb.log({"Learning Rate": scheduler.get_lr()[0]})
+        wandb.log({"Learning Rate": scheduler.get_lr()[0]}, step=epoch)
         scheduler.step()
 
         logger.info(f"Epoch {epoch} finished.\n")

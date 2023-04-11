@@ -227,7 +227,7 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    wandb.init(config=hyperparams.to_dict(), name="Cosine Scheduler Updated")
+    wandb.init(config=hyperparams.to_dict(), name="Val set as Train Dataset")
 
     model = smodel.get_model(
         img_size=hyperparams.ROI,
@@ -256,7 +256,8 @@ def main():
     )
 
     train_dataset = get_train_dataset(args.data_dir)
-    val_dataset = get_val_dataset(args.data_dir)
+    # val_dataset = get_val_dataset(args.data_dir)
+    val_dataset = get_train_dataset(args.data_dir)
 
     train_loader = DataLoader(
         train_dataset,

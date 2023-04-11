@@ -1,5 +1,4 @@
-import os
-import tempfile
+import argparse
 from functools import partial
 from typing import Dict, Optional, Union
 
@@ -20,69 +19,34 @@ from bts.data.dataset import get_train_dataset
 logger = logutils.get_logger(__name__)
 
 
-wandb.init(name="Old code")
+def get_args() -> argparse.Namespace:
+    """Retrieve arguments passed to the script.
 
+    Returns:
+        Namespace object where each argument can be accessed using the dot notation.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        required=True,
+        help="Path to dataset directory.",
+    )
+    parser.add_argument(
+        "--hyperparameters",
+        type=str,
+        help=(
+            "Training hyperparameters file path. The file in the path given should be "
+            "a valid yaml file. If not specified script will look for a "
+            "``hyperparameters.yaml`` file in the same directory the script is located "
+            "in."
+        ),
+    )
+    parser.add_argument(
+        "--output", type=str, required=True, help="Path to save the trained model."
+    )
 
-batch_size = 2
-shuffle = True
-
-roi = (128, 128, 128)
-
-
-# create transformations
-dataset = get_train_dataset("/home/vedatb/senior-project/data/btsed_dataset")
-
-dataloader = data.DataLoader(
-    dataset,
-    batch_size=batch_size,
-    shuffle=False,
-    num_workers=2,
-    pin_memory=True,
-)
-
-
-directory = os.environ.get("MONAI_DATA_DIRECTORY")
-directory = "/home/vedatb/senior-project/bbm47980_bts/old-model-checkpoints"
-root_dir = tempfile.mkdtemp() if directory is None else directory
-print(root_dir)
-
-
-device = "cuda"
-device = torch.device(device)
-
-
-model = SwinUNETR(
-    img_size=roi,
-    in_channels=1,
-    out_channels=2,
-    feature_size=48,
-    use_checkpoint=True,
-)
-model = torch.nn.DataParallel(model)
-model = model.to(device)
-
-
-batch_size = 2
-sw_batch_size = 2
-infer_overlap = 0.6
-max_epochs = 5000
-val_every = 250
-
-
-torch.backends.cudnn.benchmark = True
-
-
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-5)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max_epochs)
-
-
-model_inferer = partial(
-    sliding_window_inference,
-    roi_size=roi,
-    sw_batch_size=sw_batch_size,
-    predictor=model,
-    overlap=infer_overlap,
-)
+    return parser.parse_args()
 
 
 def train_epoch(
@@ -259,18 +223,47 @@ def val_epoch(
     return history
 
 
-hyperparams = miscutils.load_hyperparameters(
-    "/home/vedatb/senior-project/bbm47980_bts/bts/swinunetr/hyperparameters.yaml"
-)
-
-
-start_epoch = 0
-
-
 def main():
-    dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
+    args = get_args()
 
-    for epoch in range(start_epoch, max_epochs):
+    hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
+
+    wandb.init(name="Old code")
+
+    model = SwinUNETR(
+        img_size=hyperparams.ROI,
+        in_channels=hyperparams.IN_CHANNELS,
+        out_channels=hyperparams.OUT_CHANNELS,
+        feature_size=hyperparams.FEATURE_SIZE,
+        use_checkpoint=hyperparams.GRADIENT_CHECKPOINT,
+    )
+    model = torch.nn.DataParallel(model)
+
+    torch.backends.cudnn.benchmark = True
+
+    dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=hyperparams.LEARNING_RATE,
+        weight_decay=hyperparams.WEIGHT_DECAY,
+    )
+
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=hyperparams.EPOCHS
+    )
+
+    # create transformations
+    dataset = get_train_dataset(args.data_dir)
+
+    dataloader = data.DataLoader(
+        dataset,
+        batch_size=hyperparams.BATCH_SIZE,
+        shuffle=False,
+        num_workers=2,
+        pin_memory=True,
+    )
+
+    for epoch in range(hyperparams.EPOCHS):
         train_history = train_epoch(
             model=model,
             loader=dataloader,
@@ -282,7 +275,7 @@ def main():
         logger.info(f'Mean Train Loss: {round(train_history["Mean Train Loss"], 2)}')
         wandb.log(train_history, step=epoch)
 
-        if (epoch + 1) % val_every == 0 or epoch == 0:
+        if (epoch + 1) % 250 == 0 or epoch == 0:
             val_history = val_epoch(
                 model,
                 loader=dataloader,

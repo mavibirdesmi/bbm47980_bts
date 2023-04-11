@@ -1,53 +1,32 @@
-#!/usr/bin/env python
-# coding: utf-8
+import os
+import tempfile
+from functools import partial
+from typing import Dict, Optional, Union
 
-# Inspired from https://github.com/Project-MONAI/tutorials/blob/main/3d_segmentation/swin_unetr_brats21_segmentation_3d.ipynb
-
-# In[1]:
-
-
-import time
-
-import matplotlib
-import matplotlib.pyplot as plt
 import nrrd
 import numpy as np
+import torch
+from monai import data
+from monai.inferers import sliding_window_inference
+from monai.losses import DiceLoss
+from monai.metrics import DiceMetric
+from monai.networks.nets import SwinUNETR
+from monai.transforms import Activations, AsDiscrete
+from monai.utils.enums import MetricReduction
 from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
 
 import wandb
 from bts.common import logutils, miscutils
 from bts.common.miscutils import DotConfig
 from bts.data.dataset import get_test_dataset, get_train_dataset
 
-# In[2]:
-
-
 logger = logutils.get_logger(__name__)
 
 
-wandb.init(name="Old code -r")
-
-
-# In[3]:
-
-
-import json
-import os
-from typing import Dict, Optional, Union
-
-import torch
-from monai.config import KeysCollection
-from monai.transforms.transform import MapTransform, Transform
-from monai.utils.enums import TransformBackends
-
-# In[4]:
+wandb.init(name="Old code")
 
 
 root_path = "../../data"
-
-
-# In[5]:
 
 
 batch_size = 2
@@ -55,17 +34,6 @@ shuffle = True
 
 roi = (128, 128, 128)
 
-
-# In[6]:
-
-
-from monai import data, transforms
-from monai.data.utils import collate_meta_tensor, list_data_collate
-
-"""
-
-    
-"""
 
 # create transformations
 dataset = get_train_dataset("/home/vedatb/senior-project/data/btsed_dataset")
@@ -75,45 +43,14 @@ dataloader = data.DataLoader(
     batch_size=batch_size,
     shuffle=False,
     num_workers=2,
-    # collate_fn=collate_fn,
     pin_memory=True,
 )
-
-
-# ### Check data shape and visualize from data loader
-
-
-# ### Check data shape and visualize from nrrd filess
-
-
-# In[10]:
-
-import os
-import tempfile
-from functools import partial
-
-from monai.data import decollate_batch
-from monai.inferers import sliding_window_inference
-from monai.losses import DiceLoss
-from monai.metrics import DiceMetric
-from monai.networks.nets import SwinUNETR
-from monai.transforms import Activations, AsDiscrete
-from monai.utils.enums import MetricReduction
-
-# ### Setup data directory
-
-# In[11]:
 
 
 directory = os.environ.get("MONAI_DATA_DIRECTORY")
 directory = "/home/vedatb/senior-project/bbm47980_bts/old-model-checkpoints"
 root_dir = tempfile.mkdtemp() if directory is None else directory
 print(root_dir)
-
-
-# ### Setup average meter, fold reader, checkpoint save
-
-# In[12]:
 
 
 class AverageMeter(object):
@@ -133,9 +70,6 @@ class AverageMeter(object):
         self.avg = np.where(self.count > 0, self.sum / self.count, self.sum)
 
 
-# In[13]:
-
-
 def save_checkpoint(model, epoch, filename="model.pt", best_acc=0, dir_add=root_dir):
     state_dict = model.state_dict()
     save_dict = {"epoch": epoch, "best_acc": best_acc, "state_dict": state_dict}
@@ -144,34 +78,19 @@ def save_checkpoint(model, epoch, filename="model.pt", best_acc=0, dir_add=root_
     print("Saving checkpoint", filename)
 
 
-# ### Setup device
-
-# In[14]:
-
-
 device = "cuda"
 device = torch.device(device)
 
 
-# ### SwinUNETR Model
-
-# In[15]:
-
-
 model = SwinUNETR(
     img_size=roi,
-    in_channels=1,  # t1 images,
-    out_channels=2,  # brain and tumor
+    in_channels=1,
+    out_channels=2,
     feature_size=48,
     use_checkpoint=True,
 )
 model = torch.nn.DataParallel(model)
 model = model.to(device)
-
-
-# ### Optimizer and Loss Function
-
-# In[16]:
 
 
 batch_size = 2
@@ -181,14 +100,7 @@ max_epochs = 5000
 val_every = 250
 
 
-# In[17]:
-
-
-# Causes cuDNN to benchmark multiple convolution algorithms and select the fastest.
 torch.backends.cudnn.benchmark = True
-
-
-# In[18]:
 
 
 dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
@@ -202,9 +114,6 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-5)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max_epochs)
 
 
-# In[19]:
-
-
 model_inferer = partial(
     sliding_window_inference,
     roi_size=roi,
@@ -212,11 +121,6 @@ model_inferer = partial(
     predictor=model,
     overlap=infer_overlap,
 )
-
-
-# ### Define Train and Validation Epoch
-
-# In[20]:
 
 
 def train_epoch(
@@ -284,9 +188,6 @@ def train_epoch(
     }
 
     return history
-
-
-# In[21]:
 
 
 def val_epoch(
@@ -399,7 +300,6 @@ def val_epoch(
 hyperparams = miscutils.load_hyperparameters(
     "/home/vedatb/senior-project/bbm47980_bts/bts/swinunetr/hyperparameters.yaml"
 )
-# In[22]:
 
 
 def trainer(
@@ -450,7 +350,7 @@ def trainer(
                 device=hyperparams.DEVICE,
             )
 
-            val_loss = val_history["Mean Val Loss"]
+            # val_loss = val_history["Mean Val Loss"]
             val_brain_acc = val_history["Mean Val Brain Acc"]
             val_tumor_acc = val_history["Mean Val Tumor Acc"]
             val_mean_acc = val_history["Mean Val Tumor Acc"]
@@ -485,9 +385,6 @@ def trainer(
     )
 
 
-# In[23]:
-
-
 start_epoch = 0
 
 (
@@ -512,24 +409,8 @@ start_epoch = 0
 )
 
 
-# In[ ]:
-
 print(f"train completed, best average dice: {val_acc_max:.4f} ")
 
-
-# ## Plot the Losses and Metrics
-
-
-# ## Test the Model
-
-# ### Read test json
-
-# In[ ]:
-
-
-# ### Create test dataset and dataloader
-
-# In[ ]:
 
 test_ds = get_test_dataset("/home/vedatb/senior-project/data/btsed_dataset")
 
@@ -540,12 +421,6 @@ test_loader = data.DataLoader(
     num_workers=2,
     pin_memory=True,
 )
-
-
-# ### Load the best saved checkpoint and perform inference
-# We select a single case from the validation set and perform inference to compare the model segmentation output with the corresponding label
-
-# In[ ]:
 
 
 model.load_state_dict(torch.load(os.path.join(root_dir, "model.pt"))["state_dict"])

@@ -3,18 +3,17 @@ from functools import partial
 from typing import Dict, Optional, Union
 
 import torch
-from monai import data
 from monai.inferers import sliding_window_inference
 from monai.losses.dice import DiceCELoss, DiceLoss
 from monai.metrics import DiceMetric
-from monai.networks.nets import SwinUNETR
 from monai.transforms import Activations, AsDiscrete
 from torch.utils.data import DataLoader
 
 import wandb
 from bts.common import logutils, miscutils
-from bts.common.miscutils import DotConfig
-from bts.data.dataset import get_train_dataset
+from bts.common.miscutils import DotConfig, save_checkpoint
+from bts.data.dataset import get_train_dataset, get_val_dataset
+from bts.swinunetr import model as smodel
 
 logger = logutils.get_logger(__name__)
 
@@ -228,18 +227,19 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    wandb.init(name="Old code")
+    wandb.init(config=hyperparams.to_dict(), name="Old code")
 
-    model = SwinUNETR(
+    model = smodel.get_model(
         img_size=hyperparams.ROI,
         in_channels=hyperparams.IN_CHANNELS,
         out_channels=hyperparams.OUT_CHANNELS,
         feature_size=hyperparams.FEATURE_SIZE,
         use_checkpoint=hyperparams.GRADIENT_CHECKPOINT,
     )
-    model = torch.nn.DataParallel(model)
 
-    torch.backends.cudnn.benchmark = True
+    smodel.set_cudnn_benchmark()
+
+    model = torch.nn.DataParallel(model)
 
     dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
     optimizer = torch.optim.AdamW(
@@ -247,7 +247,6 @@ def main():
         lr=hyperparams.LEARNING_RATE,
         weight_decay=hyperparams.WEIGHT_DECAY,
     )
-
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=hyperparams.EPOCHS
     )
@@ -255,7 +254,7 @@ def main():
     # create transformations
     dataset = get_train_dataset(args.data_dir)
 
-    dataloader = data.DataLoader(
+    dataloader = DataLoader(
         dataset,
         batch_size=hyperparams.BATCH_SIZE,
         shuffle=False,
@@ -265,11 +264,12 @@ def main():
 
     for epoch in range(hyperparams.EPOCHS):
         train_history = train_epoch(
-            model=model,
+            model,
             loader=dataloader,
+            loss_function=dice_loss,
             optimizer=optimizer,
             epoch=epoch,
-            loss_function=dice_loss,
+            device=hyperparams.DEVICE,
         )
 
         logger.info(f'Mean Train Loss: {round(train_history["Mean Train Loss"], 2)}')

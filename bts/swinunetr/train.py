@@ -229,8 +229,6 @@ def main():
 
     wandb.init(config=hyperparams.to_dict(), name="Cosine Scheduler Updated")
 
-    smodel.set_cudnn_benchmark()
-
     model = smodel.get_model(
         img_size=hyperparams.ROI,
         in_channels=hyperparams.IN_CHANNELS,
@@ -238,6 +236,8 @@ def main():
         feature_size=hyperparams.FEATURE_SIZE,
         use_checkpoint=hyperparams.GRADIENT_CHECKPOINT,
     )
+
+    smodel.set_cudnn_benchmark()
 
     model = torch.nn.DataParallel(model)
 

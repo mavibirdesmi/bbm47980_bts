@@ -469,6 +469,8 @@ def trainer(
                     epoch,
                     best_acc=val_acc_max,
                 )
+
+            wandb.log({"Learning Rate": scheduler.get_lr()[0]})
             scheduler.step()
 
     print("Training Finished !, Best Accuracy: ", val_acc_max)

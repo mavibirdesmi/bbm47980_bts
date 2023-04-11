@@ -329,9 +329,10 @@ def main():
                 f"Mean Val Tumor Acc.: {round(val_tumor_acc, 2)} "
             )
 
-        logger.info(f"Epoch {epoch} finished.\n")
-
+        wandb.log({"Learning Rate": scheduler.get_lr()[0]})
         scheduler.step()
+
+        logger.info(f"Epoch {epoch} finished.\n")
 
 
 if __name__ == "__main__":

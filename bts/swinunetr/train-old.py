@@ -227,7 +227,7 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    wandb.init(config=hyperparams.to_dict(), name="Old code")
+    wandb.init(config=hyperparams.to_dict(), name="Old and the new are now same.")
 
     model = smodel.get_model(
         img_size=hyperparams.ROI,
@@ -242,6 +242,10 @@ def main():
     model = torch.nn.DataParallel(model)
 
     dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
+
+    # class_weights = torch.Tensor([0.1, 0.9]).to(hyperparams.DEVICE)
+    # dice_loss = DiceCELoss(to_onehot_y=False, sigmoid=True, ce_weight=class_weights)
+
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=hyperparams.LEARNING_RATE,
@@ -251,21 +255,31 @@ def main():
         optimizer, T_max=hyperparams.EPOCHS
     )
 
-    # create transformations
-    dataset = get_train_dataset(args.data_dir)
+    train_dataset = get_train_dataset(args.data_dir)
+    # val_dataset = get_val_dataset(args.data_dir)
+    val_dataset = get_train_dataset(args.data_dir)
 
-    dataloader = DataLoader(
-        dataset,
+    train_loader = DataLoader(
+        train_dataset,
         batch_size=hyperparams.BATCH_SIZE,
-        shuffle=False,
+        num_workers=2,
+        pin_memory=True,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=hyperparams.BATCH_SIZE,
         num_workers=2,
         pin_memory=True,
     )
 
+    val_acc_max = 0.0
+
     for epoch in range(hyperparams.EPOCHS):
+        logger.info(f"Epoch {epoch} is starting.")
+
         train_history = train_epoch(
             model,
-            loader=dataloader,
+            loader=train_loader,
             loss_function=dice_loss,
             optimizer=optimizer,
             epoch=epoch,
@@ -278,7 +292,7 @@ def main():
         if (epoch + 1) % 250 == 0 or epoch == 0:
             val_history = val_epoch(
                 model,
-                loader=dataloader,
+                loader=val_loader,
                 loss_function=dice_loss,
                 roi_size=hyperparams.ROI,
                 sw_batch_size=hyperparams.SW_BATCH_SIZE,
@@ -288,15 +302,38 @@ def main():
                 device=hyperparams.DEVICE,
             )
 
-            # val_loss = val_history["Mean Val Loss"]
-            # val_brain_acc = val_history["Mean Val Brain Acc"]
-            # val_tumor_acc = val_history["Mean Val Tumor Acc"]
-            # val_mean_acc = val_history["Mean Val Tumor Acc"]
+            val_loss = val_history["Mean Val Loss"]
+            val_brain_acc = val_history["Mean Val Brain Acc"]
+            val_tumor_acc = val_history["Mean Val Tumor Acc"]
+            val_mean_acc = val_history["Mean Val Tumor Acc"]
 
             wandb.log(val_history, step=epoch)
 
+            if val_mean_acc > val_acc_max:
+                logger.info(
+                    "Mean validation accuracy increased from "
+                    f"{round(val_acc_max, 2)} to {round(val_mean_acc, 2)}"
+                )
+
+                val_acc_max = val_mean_acc
+
+                save_checkpoint(
+                    model=model,
+                    save_dir=args.output,
+                    epoch=epoch,
+                    best_acc=val_acc_max,
+                )
+
+            logger.info(
+                f"Mean Val Loss: {round(val_loss, 2)} "
+                f"Mean Val Brain Acc.: {round(val_brain_acc, 2)} "
+                f"Mean Val Tumor Acc.: {round(val_tumor_acc, 2)} "
+            )
+
             wandb.log({"Learning Rate": scheduler.get_lr()[0]}, step=epoch)
             scheduler.step()
+
+        logger.info(f"Epoch {epoch} finished.\n")
 
 
 if __name__ == "__main__":

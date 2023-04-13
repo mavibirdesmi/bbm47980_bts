@@ -227,7 +227,7 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    wandb.init(config=hyperparams.to_dict(), name="Old and the new are now same.")
+    wandb.init(config=hyperparams.to_dict(), name="Revert old code")
 
     model = smodel.get_model(
         img_size=hyperparams.ROI,
@@ -255,31 +255,21 @@ def main():
         optimizer, T_max=hyperparams.EPOCHS
     )
 
-    train_dataset = get_train_dataset(args.data_dir)
-    # val_dataset = get_val_dataset(args.data_dir)
-    val_dataset = get_train_dataset(args.data_dir)
+    # create transformations
+    dataset = get_train_dataset(args.data_dir)
 
-    train_loader = DataLoader(
-        train_dataset,
+    dataloader = DataLoader(
+        dataset,
         batch_size=hyperparams.BATCH_SIZE,
+        shuffle=False,
         num_workers=2,
         pin_memory=True,
     )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=hyperparams.BATCH_SIZE,
-        num_workers=2,
-        pin_memory=True,
-    )
-
-    val_acc_max = 0.0
 
     for epoch in range(hyperparams.EPOCHS):
-        logger.info(f"Epoch {epoch} is starting.")
-
         train_history = train_epoch(
             model,
-            loader=train_loader,
+            loader=dataloader,
             loss_function=dice_loss,
             optimizer=optimizer,
             epoch=epoch,
@@ -292,7 +282,7 @@ def main():
         if (epoch + 1) % 250 == 0 or epoch == 0:
             val_history = val_epoch(
                 model,
-                loader=val_loader,
+                loader=dataloader,
                 loss_function=dice_loss,
                 roi_size=hyperparams.ROI,
                 sw_batch_size=hyperparams.SW_BATCH_SIZE,

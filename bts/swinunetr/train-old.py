@@ -255,11 +255,10 @@ def main():
         optimizer, T_max=hyperparams.EPOCHS
     )
 
-    # create transformations
-    dataset = get_train_dataset(args.data_dir)
+    train_dataset = get_train_dataset(args.data_dir)
 
-    dataloader = DataLoader(
-        dataset,
+    train_loader = DataLoader(
+        train_dataset,
         batch_size=hyperparams.BATCH_SIZE,
         shuffle=False,
         num_workers=2,
@@ -269,7 +268,7 @@ def main():
     for epoch in range(hyperparams.EPOCHS):
         train_history = train_epoch(
             model,
-            loader=dataloader,
+            loader=train_loader,
             loss_function=dice_loss,
             optimizer=optimizer,
             epoch=epoch,
@@ -282,7 +281,7 @@ def main():
         if (epoch + 1) % 250 == 0 or epoch == 0:
             val_history = val_epoch(
                 model,
-                loader=dataloader,
+                loader=train_loader,
                 loss_function=dice_loss,
                 roi_size=hyperparams.ROI,
                 sw_batch_size=hyperparams.SW_BATCH_SIZE,

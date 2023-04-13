@@ -317,13 +317,6 @@ def main():
 
                 val_acc_max = val_mean_acc
 
-                save_checkpoint(
-                    model=model,
-                    save_dir=args.output,
-                    epoch=epoch,
-                    best_acc=val_acc_max,
-                )
-
             logger.info(
                 f"Mean Val Loss: {round(val_loss, 2)} "
                 f"Mean Val Brain Acc.: {round(val_brain_acc, 2)} "

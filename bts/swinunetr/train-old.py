@@ -265,6 +265,8 @@ def main():
         pin_memory=True,
     )
 
+    val_acc_max = 0.0
+
     for epoch in range(hyperparams.EPOCHS):
         train_history = train_epoch(
             model,

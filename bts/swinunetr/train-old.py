@@ -256,11 +256,18 @@ def main():
     )
 
     train_dataset = get_train_dataset(args.data_dir)
+    # val_dataset = get_val_dataset(args.data_dir)
+    val_dataset = get_train_dataset(args.data_dir)
 
     train_loader = DataLoader(
         train_dataset,
         batch_size=hyperparams.BATCH_SIZE,
-        shuffle=False,
+        num_workers=2,
+        pin_memory=True,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=hyperparams.BATCH_SIZE,
         num_workers=2,
         pin_memory=True,
     )
@@ -268,6 +275,8 @@ def main():
     val_acc_max = 0.0
 
     for epoch in range(hyperparams.EPOCHS):
+        logger.info(f"Epoch {epoch} is starting.")
+
         train_history = train_epoch(
             model,
             loader=train_loader,
@@ -283,7 +292,7 @@ def main():
         if (epoch + 1) % 250 == 0 or epoch == 0:
             val_history = val_epoch(
                 model,
-                loader=train_loader,
+                loader=val_loader,
                 loss_function=dice_loss,
                 roi_size=hyperparams.ROI,
                 sw_batch_size=hyperparams.SW_BATCH_SIZE,

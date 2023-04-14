@@ -227,7 +227,7 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    wandb.init(config=hyperparams.to_dict(), name="Seed everything")
+    wandb.init(config=hyperparams.to_dict(), name="Old Code: Train / Val to Train")
 
     model = smodel.get_model(
         img_size=hyperparams.ROI,
@@ -292,7 +292,7 @@ def main():
         if (epoch + 1) % 250 == 0 or epoch == 0:
             val_history = val_epoch(
                 model,
-                loader=train_loader,
+                loader=val_loader,
                 loss_function=dice_loss,
                 roi_size=hyperparams.ROI,
                 sw_batch_size=hyperparams.SW_BATCH_SIZE,

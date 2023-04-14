@@ -292,7 +292,7 @@ def main():
         if (epoch + 1) % 250 == 0 or epoch == 0:
             val_history = val_epoch(
                 model,
-                loader=val_loader,
+                loader=train_loader,
                 loss_function=dice_loss,
                 roi_size=hyperparams.ROI,
                 sw_batch_size=hyperparams.SW_BATCH_SIZE,

@@ -84,29 +84,22 @@ def train_epoch(
 
     train_loss = miscutils.AverageMeter()
 
-    with logutils.etqdm(loader, epoch=epoch) as pbar:
-        for batch_data in pbar:
-            batch_data: Dict[str, torch.Tensor]
-            image = batch_data["img"].to(device)
-            label = batch_data["label"].to(device)
+    for batch_data in loader:
+        batch_data: Dict[str, torch.Tensor]
+        image = batch_data["img"].to(device)
+        label = batch_data["label"].to(device)
 
-            optimizer.zero_grad()
+        optimizer.zero_grad()
 
-            logits = model(image)
-            loss: torch.Tensor = loss_function(logits, label)
+        logits = model(image)
+        loss: torch.Tensor = loss_function(logits, label)
 
-            loss.backward()
-            optimizer.step()
+        loss.backward()
+        optimizer.step()
 
-            loss_val = loss.item()
+        loss_val = loss.item()
 
-            train_loss.update(loss_val, image.size(0))
-
-            metrics = {
-                "Mean Loss": loss_val,
-            }
-
-            pbar.log_metrics(metrics)
+        train_loss.update(loss_val, image.size(0))
 
     history = {
         "Mean Train Loss": train_loss.avg.item(),
@@ -180,36 +173,26 @@ def val_epoch(
     post_pred = AsDiscrete(threshold=0.5, dtype="bool")
     post_sigmoid = Activations(sigmoid=True)
 
-    with torch.no_grad(), logutils.etqdm(loader, epoch=epoch) as pbar:
-        for batch_data in pbar:
-            batch_data: Dict[str, torch.Tensor]
-            image = batch_data["img"].to(device)
-            label = batch_data["label"].to(device)
+    for batch_data in loader:
+        batch_data: Dict[str, torch.Tensor]
+        image = batch_data["img"].to(device)
+        label = batch_data["label"].to(device)
 
-            logits = model_inferer(image)
+        logits = model_inferer(image)
 
-            preds = post_pred(post_sigmoid(logits))
+        preds = post_pred(post_sigmoid(logits))
 
-            loss: torch.Tensor = loss_function(logits, preds)
+        loss: torch.Tensor = loss_function(logits, preds)
 
-            loss_val = loss.item()
-            val_loss.update(loss_val, image.size(0))
+        loss_val = loss.item()
+        val_loss.update(loss_val, image.size(0))
 
-            dice_metric.reset()
-            dice_metric(y=label, y_pred=preds)
+        dice_metric.reset()
+        dice_metric(y=label, y_pred=preds)
 
-            accuracy, not_nans = dice_metric.aggregate()
+        accuracy, not_nans = dice_metric.aggregate()
 
-            val_accuracy.update(accuracy.cpu().numpy(), n=not_nans.cpu().numpy())
-
-            # `GROUND` label is excluded
-            metrics = {
-                "Mean Brain Acc": accuracy[labels.BRAIN - 1].item(),
-                "Mean Tumor Acc": accuracy[labels.TUMOR - 1].item(),
-                "Mean Loss": loss_val,
-            }
-
-            pbar.log_metrics(metrics)
+        val_accuracy.update(accuracy.cpu().numpy(), n=not_nans.cpu().numpy())
 
     # `GROUND` label is excluded
     history = {
@@ -227,7 +210,7 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    wandb.init(config=hyperparams.to_dict(), name="Old Code: Train / Val to Train")
+    wandb.init(config=hyperparams.to_dict(), name="Remove pbar")
 
     model = smodel.get_model(
         img_size=hyperparams.ROI,

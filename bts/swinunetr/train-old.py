@@ -227,7 +227,7 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    wandb.init(config=hyperparams.to_dict(), name="Revert old code")
+    wandb.init(config=hyperparams.to_dict(), name="Seed everything")
 
     model = smodel.get_model(
         img_size=hyperparams.ROI,
@@ -237,7 +237,7 @@ def main():
         use_checkpoint=hyperparams.GRADIENT_CHECKPOINT,
     )
 
-    smodel.set_cudnn_benchmark()
+    miscutils.seed_everything()
 
     model = torch.nn.DataParallel(model)
 

@@ -1,4 +1,5 @@
 import os
+import random
 from typing import Any, Dict, Generic, Optional, TypeVar, Union
 
 import numpy as np
@@ -117,3 +118,12 @@ def save_checkpoint(
     logger.info(f"Saving checkpoint to {checkpoint_path}")
 
     torch.save(save_dict, checkpoint_path)
+
+def seed_everything(seed: int = 0):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True

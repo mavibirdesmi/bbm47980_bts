@@ -227,7 +227,9 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    wandb.init(config=hyperparams.to_dict(), name="Val set as Train Dataset")
+    wandb.init(config=hyperparams.to_dict(), name="NC: same loader", save_code=True)
+
+    miscutils.seed_everything()
 
     model = smodel.get_model(
         img_size=hyperparams.ROI,
@@ -236,8 +238,6 @@ def main():
         feature_size=hyperparams.FEATURE_SIZE,
         use_checkpoint=hyperparams.GRADIENT_CHECKPOINT,
     )
-
-    smodel.set_cudnn_benchmark()
 
     model = torch.nn.DataParallel(model)
 
@@ -292,7 +292,7 @@ def main():
         if (epoch + 1) % 250 == 0 or epoch == 0:
             val_history = val_epoch(
                 model,
-                loader=val_loader,
+                loader=train_loader,
                 loss_function=dice_loss,
                 roi_size=hyperparams.ROI,
                 sw_batch_size=hyperparams.SW_BATCH_SIZE,

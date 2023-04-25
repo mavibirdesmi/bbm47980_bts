@@ -217,7 +217,7 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    wandb.init(config=hyperparams.to_dict(), name="NC: same loader", save_code=True)
+    wandb.init(config=hyperparams.to_dict(), name="This will work", save_code=True)
 
     miscutils.seed_everything()
 
@@ -263,7 +263,7 @@ def main():
 
     val_acc_max = 0.0
 
-    for epoch in range(1):
+    for epoch in range(hyperparams.EPOCHS):
         logger.info(f"Epoch {epoch} is starting.")
 
         train_history = train_epoch(

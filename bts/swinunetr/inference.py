@@ -4,6 +4,7 @@ from functools import partial
 from os.path import join
 from typing import Any, Dict, Optional, Union
 
+import nrrd
 import numpy as np
 import torch
 from monai.inferers import sliding_window_inference
@@ -13,7 +14,6 @@ from torch.utils.data import DataLoader
 from bts.common import logutils, miscutils
 from bts.common.miscutils import DotConfig
 from bts.data.dataset import get_test_dataset
-from bts.data.utils import save_prediction_as_nrrd
 from bts.swinunetr import model as smodel
 
 logger = logutils.get_logger(__name__)
@@ -129,21 +129,24 @@ def test(
             batch_data: Dict[str, torch.Tensor]
             image = batch_data["img"].to(device)
             info: Dict[str, Any] = batch_data["info"]
-            meta_dict: Dict[str, Any] = batch_data["img_meta_dict"]
+            label_meta_dict: Dict[str, Any] = batch_data["label_meta_dict"]
+
+            headers = nrrd.read_header(label_meta_dict["filename_or_obj"][0])
 
             logits = model_inferer(image)
 
             seg = post_pred(post_softmax(logits[0])).detach().cpu().numpy()
             seg = one_hot_to_discrete(seg, labels)
 
-            save_prediction_as_nrrd(
-                seg,
-                0,
-                join(
-                    output_dir,
-                    f"{info['patient_name'][0]}_prediction.nrrd",
-                ),
-                meta_dict=meta_dict,
+            save_path = join(
+                output_dir,
+                f"{info['patient_name'][0]}_prediction.seg.nrrd",
+            )
+
+            nrrd.write(
+                file=save_path,
+                data=seg,
+                header=headers,
             )
 
 

@@ -118,7 +118,6 @@ def train_epoch(
 def val_epoch(
     model: torch.nn.Module,
     loader: DataLoader,
-    loss_function: torch.nn.modules.loss._Loss,
     roi_size: int,
     sw_batch_size: int,
     overlap: int,
@@ -150,7 +149,6 @@ def val_epoch(
         Keys and values available in the dictionary are as follows:
             ``Mean Brain Acc.``: Mean accuracy value for the brain segmentation
             ``Mean Tumor Acc.``: Mean accuracy value for the tumor segmentation
-            ``Mean Loss``: Mean validation loss value for the whole segmentation.
     """
     for expected_label in ["BRAIN", "TUMOR"]:
         assert expected_label in labels, f"labels should have a {expected_label} key!"
@@ -175,7 +173,6 @@ def val_epoch(
     )
 
     val_accuracy = miscutils.AverageMeter()
-    val_loss = miscutils.AverageMeter()
 
     post_pred = AsDiscrete(threshold=0.5, dtype="bool")
     post_sigmoid = Activations(sigmoid=True)
@@ -190,11 +187,6 @@ def val_epoch(
 
             preds = post_pred(post_sigmoid(logits))
 
-            loss: torch.Tensor = loss_function(logits, preds)
-
-            loss_val = loss.item()
-            val_loss.update(loss_val, image.size(0))
-
             dice_metric.reset()
             dice_metric(y=label, y_pred=preds)
 
@@ -206,7 +198,6 @@ def val_epoch(
             metrics = {
                 "Mean Brain Acc": accuracy[labels.BRAIN - 1].item(),
                 "Mean Tumor Acc": accuracy[labels.TUMOR - 1].item(),
-                "Mean Loss": loss_val,
             }
 
             pbar.log_metrics(metrics)
@@ -216,7 +207,6 @@ def val_epoch(
         "Mean Val Brain Acc": val_accuracy.avg[labels.BRAIN - 1],
         "Mean Val Tumor Acc": val_accuracy.avg[labels.TUMOR - 1],
         "Mean Val Acc": val_accuracy.avg.mean(),
-        "Mean Val Loss": val_loss.avg.item(),
     }
 
     return history
@@ -256,8 +246,7 @@ def main():
     )
 
     train_dataset = get_train_dataset(args.data_dir)
-    # val_dataset = get_val_dataset(args.data_dir)
-    val_dataset = get_train_dataset(args.data_dir)
+    val_dataset = get_val_dataset(args.data_dir)
 
     train_loader = DataLoader(
         train_dataset,
@@ -274,7 +263,7 @@ def main():
 
     val_acc_max = 0.0
 
-    for epoch in range(hyperparams.EPOCHS):
+    for epoch in range(1):
         logger.info(f"Epoch {epoch} is starting.")
 
         train_history = train_epoch(
@@ -292,8 +281,7 @@ def main():
         if (epoch + 1) % 250 == 0 or epoch == 0:
             val_history = val_epoch(
                 model,
-                loader=train_loader,
-                loss_function=dice_loss,
+                loader=val_loader,
                 roi_size=hyperparams.ROI,
                 sw_batch_size=hyperparams.SW_BATCH_SIZE,
                 overlap=hyperparams.INFER_OVERLAP,
@@ -302,7 +290,6 @@ def main():
                 device=hyperparams.DEVICE,
             )
 
-            val_loss = val_history["Mean Val Loss"]
             val_brain_acc = val_history["Mean Val Brain Acc"]
             val_tumor_acc = val_history["Mean Val Tumor Acc"]
             val_mean_acc = val_history["Mean Val Tumor Acc"]
@@ -320,12 +307,9 @@ def main():
                 save_checkpoint(
                     model=model,
                     save_dir=args.output,
-                    epoch=epoch,
-                    best_acc=val_acc_max,
                 )
 
             logger.info(
-                f"Mean Val Loss: {round(val_loss, 2)} "
                 f"Mean Val Brain Acc.: {round(val_brain_acc, 2)} "
                 f"Mean Val Tumor Acc.: {round(val_tumor_acc, 2)} "
             )

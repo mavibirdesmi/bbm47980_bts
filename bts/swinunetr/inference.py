@@ -188,15 +188,13 @@ def main():
         use_checkpoint=hyperparams.GRADIENT_CHECKPOINT,
     )
 
-    checkpoint = torch.load(args.model)
-
-    model.load_state_dict(checkpoint["state_dict"], strict=False)
-
     model = torch.nn.DataParallel(model)
+
+    model = miscutils.load_checkpoint(model, args.model)
 
     dataset = get_test_dataset(args.data_dir)
 
-    loader = DataLoader(dataset=dataset, batch_size=hyperparams.BATCH_SIZE)
+    loader = DataLoader(dataset=dataset, batch_size=1)
 
     logger.info("Starting test.")
 
@@ -208,6 +206,7 @@ def main():
         overlap=hyperparams.INFER_OVERLAP,
         labels=hyperparams.LABELS,
         device=hyperparams.DEVICE,
+        output_dir=args.output_dir,
     )
 
 

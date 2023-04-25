@@ -86,11 +86,33 @@ class AverageMeter(object):
         )
 
 
+def load_checkpoint(
+    model: Union[torch.nn.Module, torch.nn.parallel.DataParallel], checkpoint_path: str
+) -> Union[torch.nn.Module, torch.nn.parallel.DataParallel]:
+    """Loads the model checkpoint and returns it.
+
+    Args:
+        model_path: Path to the model.
+
+    Returns:
+        Checkpoint loaded model.
+    """
+    if not checkpoint_path.endswith("model.pt"):
+        checkpoint_path = os.path.join(checkpoint_path, "model.pt")
+
+    state_dict = torch.load(checkpoint_path)
+
+    if isinstance(model, torch.nn.parallel.DataParallel):
+        model.module.load_state_dict(state_dict)
+    else:
+        model.load_state_dict(state_dict)
+
+    return model
+
+
 def save_checkpoint(
     model: torch.nn.Module,
     save_dir: str,
-    epoch: Optional[int] = None,
-    best_acc: Optional[int] = None,
 ):
     """Save model checkpoint in the given directory, with `model.pt` name.
 
@@ -105,25 +127,24 @@ def save_checkpoint(
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
-    state_dict = model.state_dict()
-    save_dict = {"state_dict": state_dict}
-
-    if epoch:
-        save_dict["epoch"] = epoch
-
-    if best_acc:
-        save_dict["best_acc"] = best_acc
+    if isinstance(model, torch.nn.parallel.DataParallel):
+        state_dict = model.module.state_dict()
+    else:
+        state_dict = model.state_dict()
 
     checkpoint_path = os.path.join(save_dir, "model.pt")
     logger.info(f"Saving checkpoint to {checkpoint_path}")
 
-    torch.save(save_dict, checkpoint_path)
+    torch.save(state_dict, checkpoint_path)
+
 
 def seed_everything(seed: int = 0):
     random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
+
+    logger.info("Everything is seeded.")

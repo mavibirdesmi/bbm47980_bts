@@ -3,11 +3,11 @@ from functools import partial
 from typing import Dict, Optional, Union
 
 import torch
+from monai.data import DataLoader
 from monai.inferers import sliding_window_inference
 from monai.losses.dice import DiceCELoss, DiceLoss
 from monai.metrics import DiceMetric
 from monai.transforms import Activations, AsDiscrete
-from torch.utils.data import DataLoader
 
 import wandb
 from bts.common import logutils, miscutils

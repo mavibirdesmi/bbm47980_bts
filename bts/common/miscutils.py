@@ -119,10 +119,6 @@ def save_checkpoint(
     Args:
         model: Trained model.
         save_dir: Directory to save the model checkpoint.
-        epoch: Epoch number. Stored to the model state dictionary.
-            Defaults to `None`.
-        best_acc: Best accuracy. Stored to the model state dictionary.
-            Defaults to `None`.
     """
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)

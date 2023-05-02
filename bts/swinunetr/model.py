@@ -49,6 +49,25 @@ class SwinUNETRModel(pl.LightningModule):
             include_background=True, reduction="mean_batch", get_not_nans=True
         )
 
+        self.val_model_inferer = partial(
+            sliding_window_inference,
+            roi_size=self.img_size,
+            sw_batch_size=4,
+            predictor=self,
+            overlap=0.5,
+        )
+
+        self.test_model_inferer = partial(
+            sliding_window_inference,
+            roi_size=self.img_size,
+            sw_batch_size=1,
+            predictor=self,
+            overlap=0.6,
+        )
+
+        self.post_pred = AsDiscrete(argmax=False, threshold=0.5)
+        self.post_sigmoid = Activations(sigmoid=True)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
@@ -69,21 +88,10 @@ class SwinUNETRModel(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        model_inferer = partial(
-            sliding_window_inference,
-            roi_size=self.img_size,
-            sw_batch_size=2,
-            predictor=self,
-            overlap=0.6,
-        )
-
-        post_pred = AsDiscrete(argmax=False, threshold=0.5)
-        post_sigmoid = Activations(sigmoid=True)
-
         img, label = batch["img"], batch["label"]
-        logits = model_inferer(img)
+        logits = self.val_model_inferer(img)
 
-        pred = post_pred(post_sigmoid(logits))
+        pred = self.post_pred(self.post_sigmoid(logits))
 
         loss = self.loss_fn(pred, label)
         self.metric_fn(pred, label)
@@ -118,24 +126,15 @@ class SwinUNETRModel(pl.LightningModule):
         self.metric_fn.reset()
 
     def test_step(self, batch: Dict[str, Union[torch.Tensor, Any]], batch_idx):
-        model_inferer = partial(
-            sliding_window_inference,
-            roi_size=self.img_size,
-            sw_batch_size=2,
-            predictor=self,
-            overlap=0.6,
-        )
-
-        post_pred = AsDiscrete(threshold=0.5, dtype="bool")
-        post_sigmoid = Activations(sigmoid=True)
-
         image = batch["img"]
         info = batch["info"]
         label_meta_dict = batch["label_meta_dict"]
         headers = nrrd.read_header(label_meta_dict["filename_or_obj"][0])
 
-        logits = model_inferer(image)
-        pred = post_pred(post_sigmoid(logits[0])).detach().cpu().numpy()
+        logits = self.test_model_inferer(image)
+
+        pred = self.post_pred(self.post_sigmoid(logits[0]))
+        pred = pred.detach().cpu().numpy()
 
         seg = self.one_hot_to_discrete(pred)
 
@@ -151,7 +150,7 @@ class SwinUNETRModel(pl.LightningModule):
         )
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-4, weight_decay=1e-5)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=1e-4, weight_decay=1e-5)
         scheduler = {
             "scheduler": CosineAnnealingLR(optimizer, T_max=self.max_epochs),
             "interval": "epoch",

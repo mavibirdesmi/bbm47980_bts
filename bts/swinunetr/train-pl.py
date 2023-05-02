@@ -57,6 +57,7 @@ if __name__ == "__main__":
         img_size=image_size,
         classes=hyperparameters.LABELS,
         output_dir="predictions",
+        max_epochs=hyperparameters.EPOCHS,
     )
 
     # Initialize the wandb logger
@@ -83,7 +84,6 @@ if __name__ == "__main__":
         callbacks=[checkpoint_callback, lr_monitor],
         check_val_every_n_epoch=100,
         strategy="ddp",
-        precision=16,
     )
 
     # Train the model

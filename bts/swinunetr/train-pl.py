@@ -84,6 +84,7 @@ if __name__ == "__main__":
         callbacks=[checkpoint_callback, lr_monitor],
         check_val_every_n_epoch=100,
         strategy="ddp",
+        precision=16,
     )
 
     # Train the model

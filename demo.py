@@ -5,7 +5,7 @@ from typing import Any, Dict
 import torch
 from monai.data import DataLoader, decollate_batch
 from monai.inferers import sliding_window_inference
-from monai.transforms import Activations, AsDiscrete, Compose, LoadImaged
+from monai.transforms import Activations, AsDiscrete, Compose, LoadImaged, RandSpatialCropd
 
 from bts.data import (
     ConvertToMultiChannelBasedOnEchidnaClassesd,
@@ -18,7 +18,7 @@ from bts.swinunetr.model import get_model
 
 SPATIAL_SIZE = (128, 128, 128)
 DATASET_PATH = "/home/desmin/grad_project/echidna_dataset/btsed_dataset"
-BATCH_SIZE = 1
+BATCH_SIZE = 2
 DEVICE = "cuda"
 PREDICTION_DIR = "/home/desmin/grad_project/predictions"
 
@@ -31,8 +31,8 @@ dataset = EchidnaDataset(
             UnsqueezeDatad(["img"]),
             ConvertToMultiChannelBasedOnEchidnaClassesd(["label"]),
             # for training
-            # RandSpatialCropd(
-            # ["img", "label"], roi_size=SPATIAL_SIZE, random_size=False),
+            RandSpatialCropd(
+            ["img", "label"], roi_size=SPATIAL_SIZE, random_size=False),
             JsonTransform(["info"]),
         ]
     ),
@@ -43,7 +43,7 @@ test_dataset = dataset[4:]
 
 print(
     f"Train dataset length: {len(train_dataset)}\n"
-    "Test dataset length: {len(test_dataset)}"
+    f"Test dataset length: {len(test_dataset)}"
 )
 
 train_loader = DataLoader(dataset=train_dataset, batch_size=BATCH_SIZE)

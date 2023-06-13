@@ -1,10 +1,10 @@
-import nrrd
-import numpy as np
+import json
 import os
 from collections import OrderedDict, defaultdict
-from tqdm.auto import tqdm
 
-import json
+import nrrd
+import numpy as np
+from tqdm.auto import tqdm
 
 BRAIN_LABEL_NAMES = set(["brain"])
 TUMOR_LABEL_NAMES = set(["tumor", "tumr", "Segment_3", "Segment_5", "tissue"])
@@ -12,14 +12,14 @@ TUMOR_LABEL_NAMES = set(["tumor", "tumr", "Segment_3", "Segment_5", "tissue"])
 BRAIN_LABEL = 1
 TUMOUR_LABEL = 2
 
-def get_class_indexes (head : OrderedDict):
 
+def get_class_indexes(head: OrderedDict):
     segment0_name = head["Segment0_Name"] if "Segment0_Name" in head.keys() else None
     segment1_name = head["Segment1_Name"] if "Segment1_Name" in head.keys() else None
 
     brain_class_index, tumor_class_index = None, None
     if segment0_name == None and segment1_name == None:
-        pass # bad data
+        pass  # bad data
 
     if segment1_name in BRAIN_LABEL_NAMES:
         brain_class_index = 2
@@ -36,8 +36,8 @@ def get_class_indexes (head : OrderedDict):
 
     return brain_class_index, tumor_class_index
 
-def convert_4d_label (label : np.ndarray, brain_idx : int, tumour_idx : int):
 
+def convert_4d_label(label: np.ndarray, brain_idx: int, tumour_idx: int):
     N, H, W, D = label.shape
     label_tr = np.zeros((H, W, D), dtype=np.uint8)
 
@@ -46,8 +46,8 @@ def convert_4d_label (label : np.ndarray, brain_idx : int, tumour_idx : int):
 
     return label_tr
 
-def convert_3d_label (label : np.ndarray, brain_idx : int, tumour_idx : int):
 
+def convert_3d_label(label: np.ndarray, brain_idx: int, tumour_idx: int):
     H, W, D = label.shape
     label_tr = np.zeros((H, W, D), dtype=np.uint8)
 
@@ -56,8 +56,8 @@ def convert_3d_label (label : np.ndarray, brain_idx : int, tumour_idx : int):
 
     return label_tr
 
-def add_modality_info (json_path : str):
 
+def add_modality_info(json_path: str):
     t1 = set(["64", "3", "113", "118", "58", "52"])
     t2 = set(["79"])
     # t1c remaining
@@ -66,7 +66,6 @@ def add_modality_info (json_path : str):
         info_json = json.load(f)
 
     for patient_info in info_json["files"]:
-
         if patient_info["index"] in t1:
             patient_info["modality"] = "t1"
         elif patient_info["index"] in t2:
@@ -90,19 +89,17 @@ if __name__ == "__main__":
             if file == "label.nrrd":
                 fpath = os.path.join(root, file)
                 img, head = nrrd.read(fpath)
-                
+
                 brain_idx, tumour_idx = get_class_indexes(head)
                 if img.ndim == 3:
                     label_tr = convert_3d_label(img, brain_idx, tumour_idx)
                 elif img.ndim == 4:
                     label_tr = convert_4d_label(img, brain_idx, tumour_idx)
 
-                assert label_tr.ndim == 3 and 2 <= len(np.unique(label_tr)) <= 3, "Transformation failed"
-                
+                assert (
+                    label_tr.ndim == 3 and 2 <= len(np.unique(label_tr)) <= 3
+                ), "Transformation failed"
+
                 file_idx = os.path.basename(os.path.normpath(root))
-                np.save(
-                    os.path.join(root, f"transform_label.npy"),
-                    label_tr
-                )
+                np.save(os.path.join(root, f"transform_label.npy"), label_tr)
                 print(f"Saved {os.path.join(root, f'transform_label.npy')}")
-                

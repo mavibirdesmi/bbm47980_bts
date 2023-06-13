@@ -1,3 +1,7 @@
+import json
+import os
+from typing import Callable, Dict, List, Optional
+
 from monai.config import KeysCollection
 from monai.data import Dataset
 from monai.transforms import (
@@ -13,23 +17,10 @@ from monai.transforms import (
 from monai.utils.enums import TransformBackends
 from torch.utils.data import DataLoader
 
-import json
+MODAL2INDEX = {"flair": 0, "t1": 1, "t1c": 2, "t2": 3}
 
-from typing import Callable, Optional, List, Dict
-import os
+LABEL2INDEX = {"background": 0, "brain": 1, "tumour": 2}
 
-MODAL2INDEX = {
-    "flair" : 0,
-    "t1" : 1,
-    "t1c" : 2,
-    "t2" : 3
-}
-
-LABEL2INDEX = {
-    "background" : 0,
-    "brain" : 1,
-    "tumour" : 2
-}
 
 class PorcupineDataset(Dataset):
     """BTS Porcupine Dataset that contains t1, t1c, t2 annotated images.
@@ -60,10 +51,12 @@ class PorcupineDataset(Dataset):
         self.n_samples = len(data_paths)
 
         if not transform:
-            transform = Compose([
-                LoadImaged(["image"], reader="NrrdReader"),
-                LoadImaged(["label"], reader="NumpyReader")
-            ])
+            transform = Compose(
+                [
+                    LoadImaged(["image"], reader="NrrdReader"),
+                    LoadImaged(["label"], reader="NumpyReader"),
+                ]
+            )
 
         Dataset.__init__(self, data=data_paths, transform=transform, **kwargs)
 
@@ -74,8 +67,8 @@ class PorcupineDataset(Dataset):
             Number of classes.
         """
         return self.n_classes
-    
-    def __len__ (self) -> int:
+
+    def __len__(self) -> int:
         return self.n_samples
 
     def _generate_data_paths(self) -> List[Dict[str, str]]:
@@ -97,25 +90,26 @@ class PorcupineDataset(Dataset):
 
         with open(os.path.join(self.root_path, "map.json"), "r") as f:
             info_json = json.load(f)
-        
+
         for patient_info in info_json["files"]:
             patient_fp = os.path.join(self.root_path, patient_info["index"])
 
             fmask = [False, False, False, False]
             fmask[MODAL2INDEX[patient_info["modality"]]] = True
-            
+
             patient_data_paths = {
-                "image" : os.path.join(patient_fp, "image.nrrd"),
-                "label" : os.path.join(patient_fp, "transform_label.npy"),
-                "info" : {
-                    "index" : patient_info["index"],
-                    "modality" : patient_info["modality"]
-                }
+                "image": os.path.join(patient_fp, "image.nrrd"),
+                "label": os.path.join(patient_fp, "transform_label.npy"),
+                "info": {
+                    "index": patient_info["index"],
+                    "modality": patient_info["modality"],
+                },
             }
             data_paths.append(patient_data_paths)
 
         return data_paths
-    
+
+
 if __name__ == "__main__":
     fpath = "/home/desmin/data/porcupine_dataset"
     dataset = PorcupineDataset(dataset_root_path=fpath)
@@ -130,4 +124,3 @@ if __name__ == "__main__":
         # print(fmask)
         # print(info)
         print("==============")
-    

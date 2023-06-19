@@ -10,6 +10,6 @@ We employ a well-defined methodology that encompasses data preparation, model tr
 
 
 ## Resources
-Source codes can be found in [`course_documents`](https://github.com/mavibirdesmi/bbm47980_bts/tree/main/src)
+Source codes can be found in [`src`](https://github.com/mavibirdesmi/bbm47980_bts/tree/main/src) directory.
 
-Course documents including resources and investigation documents can be found in [`course_documents`](https://github.com/mavibirdesmi/bbm47980_bts/tree/main/course_documents)
+Documents including resources and investigation documents can be found in [`documents`](https://github.com/mavibirdesmi/bbm47980_bts/tree/main/documents) directory.

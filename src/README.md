@@ -42,3 +42,13 @@ poetry remove <package-name>
 ## Notes
 Before allocating a GPU be sure to ``poetry shell`` is not executed. In other terms,
 execute ``poetry shell`` after a GPU has been allocated.
+
+## Training
+```bash
+sbatch scripts/echidna_swin_train.sh
+```
+
+## Inference
+```bash
+sbatch scripts/echidna_swin_inference.sh
+```

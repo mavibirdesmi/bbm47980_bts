@@ -4,7 +4,6 @@
 import argparse
 import os
 import pathlib
-from typing import Dict
 
 import nrrd
 import numpy as np
@@ -41,9 +40,9 @@ def transform_3d_nrrd(
     """Transform function for 3 dimensional NRRD images
 
     Args:
-        data (np.ndarray): Data to be transformed, expected to have .ndim=4
-        label_brain (int): The integer that refers to brain in the data
-        label_tumour (int): The integer that refers to tumour in the data
+        data: Data to be transformed, expected to have .ndim=4
+        label_brain: The integer that refers to brain in the data
+        label_tumour: The integer that refers to tumour in the data
 
     Returns:
         np.ndarray: Transformed data
@@ -67,11 +66,11 @@ def transform_4d_nrrd(
     """Transform function for 4 dimensional NRRD images
 
     Args:
-        data (np.ndarray): Data to be transformed, expected to have .ndim=4
-        label_brain (int): The integer that refers to brain in the data
-        brain_0th_axis_idx (int): In 0th axis, the channel has the brain labels
-        label_tumour (int): The integer that refers to tumour in the data
-        tumour_0th_axis_idx (int): In 0th axis, the channel has the tumour labels
+        data: Data to be transformed, expected to have .ndim=4
+        label_brain: The integer that refers to brain in the data
+        brain_0th_axis_idx: In 0th axis, the channel has the brain labels
+        label_tumour: The integer that refers to tumour in the data
+        tumour_0th_axis_idx: In 0th axis, the channel has the tumour labels
 
     Returns:
         np.ndarray: Transformed data
@@ -119,6 +118,7 @@ if __name__ == "__main__":
             args.label_tumour,
             args.tumour_0th_axis_idx,
         )
+        header["kinds"] = ["domain" for _ in range(3)]
 
     print(f"Finished processing, writing to {path.parent}/transformed_label.nrrd")
     transformed_data

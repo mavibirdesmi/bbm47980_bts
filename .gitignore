@@ -8,8 +8,14 @@ __pycache__
 .env
 
 # Poetry
-poetry.lock
+# poetry.lock
 .venv
 
 # Wandb artifacts
 *wandb
+
+# Log artifacts
+*.log
+
+# Model checkpoints
+*.pt

@@ -3,17 +3,17 @@ from functools import partial
 from typing import Dict, Optional, Union
 
 import torch
-from monai.data import decollate_batch
+from monai.data import DataLoader
 from monai.inferers import sliding_window_inference
-from monai.losses.dice import DiceLoss
+from monai.losses.dice import DiceCELoss, DiceLoss
 from monai.metrics import DiceMetric
 from monai.transforms import Activations, AsDiscrete
-from torch.utils.data import DataLoader
 
-from common import logutils, miscutils
-from common.miscutils import DotConfig
-from data.dummydataset import get_dataloader
-from swinunetr import model as smodel
+import wandb
+from bts.common import logutils, miscutils
+from bts.common.miscutils import DotConfig, save_checkpoint
+from bts.data.dataset import get_train_dataset, get_val_dataset
+from bts.swinunetr import model as smodel
 
 logger = logutils.get_logger(__name__)
 
@@ -25,6 +25,12 @@ def get_args() -> argparse.Namespace:
         Namespace object where each argument can be accessed using the dot notation.
     """
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        required=True,
+        help="Path to dataset directory.",
+    )
     parser.add_argument(
         "--hyperparameters",
         type=str,
@@ -57,7 +63,7 @@ def train_epoch(
     Args:
         model: Model to train.
         loader: Data loader.
-            The batch data should be a dictionary containing "image" and "label" keys.
+            The batch data should be a dictionary containing "img" and "label" keys.
         loss_function: Loss function to measure the loss during the training.
         optimizer: Optimizer to optimize the loss.
         epoch: Epoch number. Only used in the progress bar to display the current epoch.
@@ -74,14 +80,14 @@ def train_epoch(
         device = torch.device(device)
 
     model = model.to(device)
-    model.train()
+    model = model.train()
 
     train_loss = miscutils.AverageMeter()
 
     with logutils.etqdm(loader, epoch=epoch) as pbar:
         for batch_data in pbar:
             batch_data: Dict[str, torch.Tensor]
-            image = batch_data["image"].to(device)
+            image = batch_data["img"].to(device)
             label = batch_data["label"].to(device)
 
             optimizer.zero_grad()
@@ -92,18 +98,18 @@ def train_epoch(
             loss.backward()
             optimizer.step()
 
-            loss = loss.item()
+            loss_val = loss.item()
 
-            train_loss.update(loss, image.size(0))
+            train_loss.update(loss_val, image.size(0))
 
             metrics = {
-                "Mean Train Loss": loss,
+                "Mean Loss": loss_val,
             }
 
             pbar.log_metrics(metrics)
 
     history = {
-        "Mean Loss": train_loss.avg,
+        "Mean Train Loss": train_loss.avg.item(),
     }
 
     return history
@@ -112,7 +118,6 @@ def train_epoch(
 def val_epoch(
     model: torch.nn.Module,
     loader: DataLoader,
-    loss_function: torch.nn.modules.loss._Loss,
     roi_size: int,
     sw_batch_size: int,
     overlap: int,
@@ -125,7 +130,7 @@ def val_epoch(
     Args:
         model: Model to evaluate.
         loader: Data loader.
-            The batch data should be a dictionary containing "image" and "label" keys.
+            The batch data should be a dictionary containing "img" and "label" keys.
         loss_function: Loss function to measure the loss during the validation.
         roi_size: The spatial window size for inferences.
         sw_batch_size: The batch size to run window slices.
@@ -144,7 +149,6 @@ def val_epoch(
         Keys and values available in the dictionary are as follows:
             ``Mean Brain Acc.``: Mean accuracy value for the brain segmentation
             ``Mean Tumor Acc.``: Mean accuracy value for the tumor segmentation
-            ``Mean Loss``: Mean validation loss value for the whole segmentation.
     """
     for expected_label in ["BRAIN", "TUMOR"]:
         assert expected_label in labels, f"labels should have a {expected_label} key!"
@@ -164,62 +168,45 @@ def val_epoch(
         overlap=overlap,
     )
 
-    dice_metric = DiceMetric(include_background=True, reduction="mean_batch")
+    dice_metric = DiceMetric(
+        include_background=True, reduction="mean_batch", get_not_nans=True
+    )
 
     val_accuracy = miscutils.AverageMeter()
-    val_loss = miscutils.AverageMeter()
 
-    post_softmax = Activations(softmax=True)
-    post_pred = AsDiscrete(argmax=True)
+    post_pred = AsDiscrete(threshold=0.5, dtype="bool")
+    post_sigmoid = Activations(sigmoid=True)
 
     with torch.no_grad(), logutils.etqdm(loader, epoch=epoch) as pbar:
         for batch_data in pbar:
             batch_data: Dict[str, torch.Tensor]
-            image = batch_data["image"].to(device)
+            image = batch_data["img"].to(device)
             label = batch_data["label"].to(device)
 
             logits = model_inferer(image)
 
-            batch_labels = decollate_batch(label)
-            outputs = decollate_batch(logits)
-            preds = torch.stack(
-                [
-                    post_pred(post_softmax(val_pred_tensor))
-                    for val_pred_tensor in outputs
-                ]
-            )
-
-            loss: torch.Tensor = loss_function(logits, preds)
-            loss = loss.item()
-
-            val_loss.update(loss, image.size(0))
+            preds = post_pred(post_sigmoid(logits))
 
             dice_metric.reset()
-            dice_metric(y_pred=preds, y=batch_labels)
+            dice_metric(y=label, y_pred=preds)
 
-            accuracy = dice_metric.aggregate()
-            val_accuracy.update(accuracy, image.size(0))
+            accuracy, not_nans = dice_metric.aggregate()
 
-            num_gt_labels = len(labels)
-            num_pred_labels = accuracy.numel()
-            assert num_gt_labels == num_pred_labels, (
-                f"Number of labels should match with the number of prediction labels. "
-                f"Found num labels: '{num_gt_labels}' != "
-                f"num prediction labels: '{num_pred_labels}' "
-            )
+            val_accuracy.update(accuracy.cpu().numpy(), n=not_nans.cpu().numpy())
 
+            # `GROUND` label is excluded
             metrics = {
-                "Mean Val Brain Acc.": accuracy[labels.BRAIN],
-                "Mean Val Tumor Acc.": accuracy[labels.TUMOR],
-                "Mean Val Loss": val_loss,
+                "Mean Brain Acc": accuracy[labels.BRAIN - 1].item(),
+                "Mean Tumor Acc": accuracy[labels.TUMOR - 1].item(),
             }
 
             pbar.log_metrics(metrics)
 
+    # `GROUND` label is excluded
     history = {
-        "Mean Brain Acc.": val_accuracy.avg[labels.BRAIN],
-        "Mean Tumor Acc.": val_accuracy.avg[labels.TUMOR],
-        "Mean Loss": val_loss.avg,
+        "Mean Val Brain Acc": val_accuracy.avg[labels.BRAIN - 1],
+        "Mean Val Tumor Acc": val_accuracy.avg[labels.TUMOR - 1],
+        "Mean Val Acc": val_accuracy.avg.mean(),
     }
 
     return history
@@ -230,7 +217,9 @@ def main():
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
 
-    smodel.set_cudnn_benchmark()
+    wandb.init(config=hyperparams.to_dict(), name="This will work", save_code=True)
+
+    miscutils.seed_everything()
 
     model = smodel.get_model(
         img_size=hyperparams.ROI,
@@ -242,8 +231,10 @@ def main():
 
     model = torch.nn.DataParallel(model)
 
-    # dice_loss = DiceLoss(to_onehot_y=False, softmax=True)
-    dice_loss = DiceLoss(include_background=True, to_onehot_y=False, softmax=True)
+    dice_loss = DiceLoss(to_onehot_y=False, sigmoid=True)
+
+    # class_weights = torch.Tensor([0.1, 0.9]).to(hyperparams.DEVICE)
+    # dice_loss = DiceCELoss(to_onehot_y=False, sigmoid=True, ce_weight=class_weights)
 
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -254,10 +245,25 @@ def main():
         optimizer, T_max=hyperparams.EPOCHS
     )
 
-    train_loader = get_dataloader()
-    val_loader = get_dataloader()
+    train_dataset = get_train_dataset(args.data_dir)
+    val_dataset = get_val_dataset(args.data_dir)
 
-    for epoch in range(1, hyperparams.EPOCHS + 1):
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=hyperparams.BATCH_SIZE,
+        num_workers=2,
+        pin_memory=True,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=hyperparams.BATCH_SIZE,
+        num_workers=2,
+        pin_memory=True,
+    )
+
+    val_acc_max = 0.0
+
+    for epoch in range(hyperparams.EPOCHS):
         logger.info(f"Epoch {epoch} is starting.")
 
         train_history = train_epoch(
@@ -269,13 +275,13 @@ def main():
             device=hyperparams.DEVICE,
         )
 
-        logger.info(f'Mean Train Loss: {train_history["Mean Loss"]}')
+        logger.info(f'Mean Train Loss: {round(train_history["Mean Train Loss"], 2)}')
+        wandb.log(train_history, step=epoch)
 
-        if epoch % 100 == 0:
+        if (epoch + 1) % 250 == 0 or epoch == 0:
             val_history = val_epoch(
                 model,
                 loader=val_loader,
-                loss_function=dice_loss,
                 roi_size=hyperparams.ROI,
                 sw_batch_size=hyperparams.SW_BATCH_SIZE,
                 overlap=hyperparams.INFER_OVERLAP,
@@ -284,19 +290,34 @@ def main():
                 device=hyperparams.DEVICE,
             )
 
-            val_loss = val_history["Mean Loss"]
-            val_brain_acc = val_history["Mean Brain Acc."]
-            val_tumor_acc = val_history["Mean Tumor Acc."]
+            val_brain_acc = val_history["Mean Val Brain Acc"]
+            val_tumor_acc = val_history["Mean Val Tumor Acc"]
+            val_mean_acc = val_history["Mean Val Tumor Acc"]
+
+            wandb.log(val_history, step=epoch)
+
+            if val_mean_acc > val_acc_max:
+                logger.info(
+                    "Mean validation accuracy increased from "
+                    f"{round(val_acc_max, 2)} to {round(val_mean_acc, 2)}"
+                )
+
+                val_acc_max = val_mean_acc
+
+                save_checkpoint(
+                    model=model,
+                    save_dir=args.output,
+                )
 
             logger.info(
-                f"Mean Val Loss: {val_loss} "
-                f"Mean Val Brain Acc.: {val_brain_acc} "
-                f"Mean Val Tumor Acc.: {val_tumor_acc} "
+                f"Mean Val Brain Acc.: {round(val_brain_acc, 2)} "
+                f"Mean Val Tumor Acc.: {round(val_tumor_acc, 2)} "
             )
 
-        logger.info(f"Epoch {epoch} finished.\n")
+            wandb.log({"Learning Rate": scheduler.get_lr()[0]}, step=epoch)
+            scheduler.step()
 
-        scheduler.step()
+        logger.info(f"Epoch {epoch} finished.\n")
 
 
 if __name__ == "__main__":

@@ -1,19 +1,20 @@
 import argparse
+import os
 from functools import partial
-from typing import Dict, Union
+from os.path import join
+from typing import Any, Dict, Optional, Union
 
+import nrrd
+import numpy as np
 import torch
-from monai.data import decollate_batch
 from monai.inferers import sliding_window_inference
-from monai.losses.dice import DiceLoss
-from monai.metrics import DiceMetric
 from monai.transforms import Activations, AsDiscrete
 from torch.utils.data import DataLoader
 
-from common import logutils, miscutils
-from common.miscutils import DotConfig
-from data.dummydataset import get_dataloader
-from swinunetr import model as smodel
+from bts.common import logutils, miscutils
+from bts.common.miscutils import DotConfig
+from bts.data.dataset import get_test_dataset
+from bts.swinunetr import model as smodel
 
 logger = logutils.get_logger(__name__)
 
@@ -26,6 +27,18 @@ def get_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--data-dir",
+        type=str,
+        required=True,
+        help="Path to dataset directory.",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        required=True,
+        help="Path to trained model.",
+    )
+    parser.add_argument(
         "--hyperparameters",
         type=str,
         help=(
@@ -36,7 +49,13 @@ def get_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--output", type=str, required=True, help="Path to save the trained model."
+        "--output-dir",
+        type=str,
+        required=False,
+        help=(
+            "Path to save the the predictions. If not set, will create a directory "
+            "named `predictions, and save the prediction into it."
+        ),
     )
 
     return parser.parse_args()
@@ -45,12 +64,12 @@ def get_args() -> argparse.Namespace:
 def test(
     model: torch.nn.Module,
     loader: DataLoader,
-    loss_function: torch.nn.modules.loss._Loss,
     roi_size: int,
     sw_batch_size: int,
     overlap: int,
-    labels: DotConfig[str, DotConfig[str, int]],
-    device: torch.device = None,
+    labels: DotConfig[str, int],
+    device: Optional[torch.device] = None,
+    output_dir: Optional[str] = None,
 ) -> Dict[str, Union[float, torch.Tensor]]:
     """Tests the given model.
 
@@ -58,7 +77,6 @@ def test(
         model: Model to test.
         loader: Data loader.
             The batch data should be a dictionary containing "image" and "label" keys.
-        loss_function: Loss function to measure the loss during the validation.
         roi_size: The spatial window size for inferences.
         sw_batch_size: The batch size to run window slices.
         overlap: Amount of overlap between scans.
@@ -67,6 +85,8 @@ def test(
         epoch: Epoch number. Only used in the progress bar to display the current epoch.
         device: Device to load the model and data into. Defaults to None. If set to None
             will be set to ``cuda`` if it is available, else will be set to ``cpu``.
+        output_dir: Path to save the predictions into. If not set, will create and use
+            the ``predictions`` in the working directory.
 
     Raises:
         AssertionError: If labels does not have either of `BRAIN` and `TUMOR` keys.
@@ -85,6 +105,11 @@ def test(
         device = "cuda" if torch.cuda.is_available() else "cpu"
         device = torch.device(device)
 
+    if not output_dir:
+        output_dir = "predictions"
+
+    os.makedirs(output_dir, exist_ok=True)
+
     model = model.to(device)
     model.eval()
 
@@ -96,71 +121,65 @@ def test(
         overlap=overlap,
     )
 
-    dice_metric = DiceMetric(include_background=True, reduction="mean_batch")
-
-    test_accuracy = miscutils.AverageMeter()
-    test_loss = miscutils.AverageMeter()
-
-    post_softmax = Activations(softmax=True)
-    post_pred = AsDiscrete(argmax=True)
+    post_softmax = Activations(sigmoid=True)
+    post_pred = AsDiscrete(threshold=0.5, dtype="int8")
 
     with torch.no_grad(), logutils.etqdm(loader) as pbar:
         for batch_data in pbar:
             batch_data: Dict[str, torch.Tensor]
-            image = batch_data["image"].to(device)
-            label = batch_data["label"].to(device)
+            image = batch_data["img"].to(device)
+            info: Dict[str, Any] = batch_data["info"]
+            label_meta_dict: Dict[str, Any] = batch_data["label_meta_dict"]
+
+            headers = nrrd.read_header(label_meta_dict["filename_or_obj"][0])
 
             logits = model_inferer(image)
 
-            batch_labels = decollate_batch(label)
-            outputs = decollate_batch(logits)
-            preds = torch.stack(
-                [
-                    post_pred(post_softmax(val_pred_tensor))
-                    for val_pred_tensor in outputs
-                ]
+            seg = post_pred(post_softmax(logits[0])).detach().cpu().numpy()
+            seg = one_hot_to_discrete(seg, labels)
+
+            save_path = join(
+                output_dir,
+                f"{info['patient_name'][0]}_prediction.seg.nrrd",
             )
 
-            loss: torch.Tensor = loss_function(logits, preds)
-            loss = loss.item()
-
-            test_loss.update(loss, image.size(0))
-
-            dice_metric.reset()
-            dice_metric(y_pred=preds, y=batch_labels)
-
-            accuracy = dice_metric.aggregate()
-            test_loss.update(accuracy, image.size(0))
-
-            num_gt_labels = len(labels)
-            num_pred_labels = accuracy.numel()
-            assert num_gt_labels == num_pred_labels, (
-                f"Number of labels should match with the number of prediction labels. "
-                f"Found num labels: '{num_gt_labels}' != "
-                f"num prediction labels: '{num_pred_labels}' "
+            nrrd.write(
+                file=save_path,
+                data=seg,
+                header=headers,
             )
 
-            metrics = {
-                "Mean Test Brain Acc.": accuracy[labels.BRAIN],
-                "Mean Test Tumor Acc.": accuracy[labels.TUMOR],
-                "Mean Test Loss": test_loss,
-            }
 
-            pbar.log_metrics(metrics)
+def one_hot_to_discrete(
+    target: Union[torch.Tensor, np.ndarray], labels: DotConfig[str, str]
+) -> np.ndarray:
+    """Transform tensor in the one hot form to the discrete form.
 
-    history = {
-        "Mean Brain Acc.": test_accuracy.avg[labels.BRAIN],
-        "Mean Tumor Acc.": test_accuracy.avg[labels.TUMOR],
-        "Mean Loss": test_accuracy.avg,
-    }
+    Args:
+        target: Tensor to transform. Expected shape is (L, H, W, D) where L is the
+            number of labels.
+        labels: Labels to use in transformation
 
-    return history
+    Returns:
+        Discrete transformed array, with `int8` dtype.
+    """
+    L, H, W, D = target.shape
+    target_discrete = np.ones((H, W, D), dtype=np.int8) * labels.GROUND
+
+    target_discrete[target[0] == 1] = labels.BRAIN
+    target_discrete[target[1] == 1] = labels.TUMOR
+
+    return target_discrete
 
 
 def main():
     args = get_args()
 
     hyperparams = miscutils.load_hyperparameters(args.hyperparameters)
+
+    hyperparams.BATCH_SIZE = 1
+
+    assert hyperparams.BATCH_SIZE == 1, "Inference only works with batch size of one!"
 
     smodel.set_cudnn_benchmark()
 
@@ -174,32 +193,23 @@ def main():
 
     model = torch.nn.DataParallel(model)
 
-    # dice_loss = DiceLoss(to_onehot_y=False, softmax=True)
-    dice_loss = DiceLoss(include_background=True, to_onehot_y=False, softmax=True)
+    model = miscutils.load_checkpoint(model, args.model)
 
-    test_loader = get_dataloader()
+    dataset = get_test_dataset(args.data_dir)
 
-    logger.info("Starting test")
+    loader = DataLoader(dataset=dataset, batch_size=1)
 
-    history = test(
+    logger.info("Starting test.")
+
+    test(
         model,
-        loader=test_loader,
-        loss_function=dice_loss,
+        loader=loader,
         roi_size=hyperparams.ROI,
         sw_batch_size=hyperparams.SW_BATCH_SIZE,
         overlap=hyperparams.INFER_OVERLAP,
         labels=hyperparams.LABELS,
         device=hyperparams.DEVICE,
-    )
-
-    loss = history["Mean Loss"]
-    brain_acc = history["Mean Brain Acc."]
-    tumor_acc = history["Mean Tumor Acc."]
-
-    logger.info(
-        f"Mean Val Loss: {loss} "
-        f"Mean Val Brain Acc.: {brain_acc} "
-        f"Mean Val Tumor Acc.: {tumor_acc} "
+        output_dir=args.output_dir,
     )
 
 

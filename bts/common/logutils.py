@@ -61,18 +61,25 @@ class etqdm(tqdm):
         Raises:
             AssertionError: If the epoch parameter is not an integer.
         """
-        assert isinstance(epoch, int), "Epoch must be an integer value!"
+        if epoch:
+            assert isinstance(epoch, int), "Epoch must be an integer value!"
         desc = None
+        self.disable = None
         if epoch:
             desc = f"Epoch {epoch}"
         super().__init__(*args, **kwargs, desc=desc)
 
-    def log_metrics(self, metrics: Dict[str, Union[int, float, torch.Tensor]]):
+    def log_metrics(
+        self, metrics: Dict[str, Union[int, float, torch.Tensor]], precision=2
+    ):
         """Log metrics on the progress bar.
 
         Args:
             metrics: Dictionary of the metrics.
         """
+
+        metrics = {key: round(value, precision) for key, value in metrics.items()}
+
         self.set_postfix(
             metrics,
         )
